@@ -276,7 +276,7 @@ O app exige login. Cada usuário tem a própria conta e só enxerga os próprios
 
 **Como ligar (uma vez):**
 1. No [Neon](https://neon.tech), crie um projeto e rode [db/schema.sql](db/schema.sql) no *SQL Editor*.
-2. Na Vercel (Settings → Environment Variables) crie `DATABASE_URL` (string de conexão do Neon), `JWT_SECRET` (texto longo e aleatório) e, se quiser restringir quem cria conta, `SIGNUP_CODE`. Veja [.env.example](.env.example).
+2. Vincule o conector (`vercel connect create neon --name fiinsboy`, depois `vercel link` e `vercel env pull`): a conexão vem do Vercel Connect (`getTokenResponse('neon/fiinsboy')` em [api/_lib.js](api/_lib.js)), sem `DATABASE_URL`. Na Vercel (Settings → Environment Variables) crie `JWT_SECRET` (texto longo e aleatório) e, se quiser restringir quem cria conta, `SIGNUP_CODE`. Veja [.env.example](.env.example).
 3. Faça o deploy. A Vercel instala as dependências de [package.json](package.json) e publica as funções de `api/`.
 
 **Como funciona:** `api/register`, `api/login`, `api/logout` e `api/me` cuidam do login (senha com bcrypt, sessão em cookie `HttpOnly` assinado, 30 dias). `api/sync` envia e baixa as mudanças só do usuário do cookie. Rotas, paradas, entregas, gastos, trajetos e configurações vão para a tabela `docs`. Se a mesma coisa mudar em dois aparelhos, vale a alteração mais recente. O pacote offline e o cache de endereços ficam só no aparelho. Ao trocar de conta no mesmo aparelho, os dados locais da conta anterior são apagados (já estão no servidor).

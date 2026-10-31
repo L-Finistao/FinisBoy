@@ -1,7 +1,49 @@
 import { neon } from '@neondatabase/serverless';
 import { SignJWT, jwtVerify } from 'jose';
+import { getTokenResponse } from '@vercel/connect';
 
-export const sql = neon(process.env.DATABASE_URL);
+/* ---------- Banco: Neon pelo Vercel Connect ---------- */
+// Sem DATABASE_URL: o app pede ao conector (Vercel Connect) uma credencial do Neon, descobre a conexão do projeto
+// pela API do Neon e guarda em memória até a credencial vencer. Com DATABASE_URL definida, ela tem prioridade.
+const NEON_CONNECTOR = process.env.NEON_CONNECTOR || 'neon/fiinsboy';
+const NEON_API = 'https://console.neon.tech/api/v2';
+let cached = null;                                          // { run, exp }
+
+async function neonGet(token, path) {
+  const r = await fetch(NEON_API + path, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+  if (!r.ok) throw new Error(`Neon API ${path} → ${r.status}`);
+  return r.json();
+}
+
+async function resolveConnection() {
+  if (process.env.DATABASE_URL) return { uri: process.env.DATABASE_URL, exp: Infinity };
+  const tk = await getTokenResponse(NEON_CONNECTOR, { subject: { type: 'app' } });
+  const exp = (tk.expiresAt || Date.now() + 5 * 60 * 1000) - 60 * 1000;
+  const fromMeta = Object.values(tk.metadata || {}).find(v => typeof v === 'string' && /^postgres(ql)?:\/\//.test(v));
+  if (fromMeta) return { uri: fromMeta, exp };               // se o conector já devolver a string de conexão
+
+  const pid = process.env.NEON_PROJECT_ID || tk.metadata?.projectId || tk.metadata?.project_id
+    || (await neonGet(tk.token, '/projects?limit=10')).projects?.[0]?.id;
+  if (!pid) throw new Error('Nenhum projeto Neon encontrado para este conector.');
+  const branches = (await neonGet(tk.token, `/projects/${pid}/branches`)).branches || [];
+  const branch = branches.find(b => b.default || b.primary) || branches[0];
+  const dbs = (await neonGet(tk.token, `/projects/${pid}/branches/${branch.id}/databases`)).databases || [];
+  const db = dbs.find(d => d.name !== 'postgres') || dbs[0];
+  const { uri } = await neonGet(tk.token,
+    `/projects/${pid}/connection_uri?branch_id=${branch.id}&database_name=${encodeURIComponent(db.name)}&role_name=${encodeURIComponent(db.owner_name)}&pooled=true`);
+  return { uri, exp };
+}
+
+async function db() {
+  if (!cached || Date.now() > cached.exp) {
+    const { uri, exp } = await resolveConnection();
+    cached = { run: neon(uri), exp };
+  }
+  return cached.run;
+}
+
+// Usado como antes: await sql`select ...`
+export const sql = async (strings, ...values) => (await db())(strings, ...values);
 
 const COOKIE = 'fb_session';
 const DAYS = 30;

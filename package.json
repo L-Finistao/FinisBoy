@@ -2,9 +2,12 @@
   "name": "finisboy",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
+    "@vercel/connect": "^2.7.0",
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6"
   }
