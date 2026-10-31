@@ -110,15 +110,16 @@ const sumSlots = slots => slots.reduce((t, s) => {
   return t;
 }, { n: 0, rotas: 0, km: 0, sec: 0, gain: 0, spent: 0 });
 
-// O fixo do dia é dividido entre as rotas do mesmo período e dia, proporcional às entregas de cada uma.
+// O fixo vale uma vez por dia e período: entra inteiro na primeira rota finalizada do dia naquele período.
+// No modo "fixo por dia" as entregas não rendem nada, só entram no custo (km).
 function routeStats(r) {
   const pid = routePid(r), p = profileById(pid);
   const n = deliveries.filter(d => d.routeId === r.id).length;
   const day = dayKey(r.endedAt);
-  const dayN = deliveries.filter(d => dayKey(d.doneAt) === day && deliveryPid(d) === pid).length;
-  const dayRoutes = routes.filter(x => x.status === 'finalizada' && dayKey(x.endedAt) === day && routePid(x) === pid).length || 1;
-  const share = dayN ? n / dayN : 1 / dayRoutes;
-  const gain = p ? (p.mode !== 'fixo' ? n * p.perDelivery : 0) + (p.mode !== 'entrega' ? p.fixed * share : 0) : 0;
+  const first = routes.filter(x => x.status === 'finalizada' && dayKey(x.endedAt) === day && routePid(x) === pid)
+    .sort((a, b) => a.endedAt - b.endedAt)[0];
+  const fixed = p && p.mode !== 'entrega' && first && first.id === r.id ? p.fixed : 0;
+  const gain = p ? (p.mode !== 'fixo' ? n * p.perDelivery : 0) + fixed : 0;
   const km = kmOf(r), cost = km * costPerKm();
   return { n, total: routeStops(r.id).length, gain, km, cost, net: gain - cost, sec: (r.endedAt - r.startedAt) / 1000 };
 }

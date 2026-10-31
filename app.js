@@ -160,6 +160,11 @@ function trackKm(p) {
 
 function setMe(p) {
   me = { lat: p.coords.latitude, lon: p.coords.longitude };
+  const hd = p.coords.heading;
+  if (hd != null && !isNaN(hd) && (p.coords.speed || 0) > 1 && Math.abs(hd - meHeading) > 5) {   // parado o GPS não sabe a direção
+    meHeading = hd;
+    avatarRefresh();
+  }
   drawMe();
   if (session) { trackKm(p); learnFix(p); recordTrack(p); liveProgress(p); }
   if (Date.now() - lastSaved > 10000) {
@@ -190,24 +195,63 @@ function watchPosition() {
 }
 
 /* ---------- Otimização da rota (OSRM /trip = caixeiro-viajante) ---------- */
+// Internet que oscila conta como queda: passou de 8 s, desiste e o mapa salvo no aparelho assume.
+async function fetchJson(url, ms = 8000) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try { return await (await fetch(url, { signal: ctl.signal })).json(); } finally { clearTimeout(t); }
+}
+
+
 // Melhor ordem possível: pega as distâncias reais entre todos os pontos (OSRM /table) e escolhe a ordem de
 // menor tempo (exata até 13 paradas), depois traça o caminho nessa ordem.
 async function osrmBest(pts, start) {
   const base = 'https://router.project-osrm.org';
   const cs = a => a.map(p => `${p.lon},${p.lat}`).join(';');
-  const tj = await (await fetch(`${base}/table/v1/driving/${cs(pts)}?annotations=duration,distance`)).json();
+  const tj = await fetchJson(`${base}/table/v1/driving/${cs(pts)}?annotations=duration,distance`);
   if (tj.code !== 'Ok') throw new Error(tj.message || tj.code);
   const fix = m => m.map(row => row.map(v => (v == null ? 1e9 : v)));
   const T = fix(tj.durations), D = fix(tj.distances);
   const { order, position } = planOrder(T, pts.length, start);
-  const rj = await (await fetch(`${base}/route/v1/driving/${cs(order.map(i => pts[i]))}?overview=full&geometries=geojson&steps=false`)).json();
+  const ordered = order.map(i => pts[i]);
+  const rt = typeof routePenalty === 'function' && hasLearning() && ordered.length <= 26
+    ? await osrmLegsLearned(base, ordered)                       // escolhe, trecho a trecho, a alternativa melhor pelo seu histórico
+    : null;
+  if (rt) return { position, legs: rt.legs, distance: rt.distance, duration: rt.duration, coords: rt.coords, baseline: baselineCost(T, D), learned: rt.learned };
+  const rj = await fetchJson(`${base}/route/v1/driving/${cs(ordered)}?overview=full&geometries=geojson&steps=false`);
   if (rj.code !== 'Ok') throw new Error(rj.message || rj.code);
-  const rt = rj.routes[0];
+  const r0 = rj.routes[0];
   return {
-    position, legs: rt.legs, distance: rt.distance, duration: rt.duration,
-    coords: rt.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+    position, legs: r0.legs, distance: r0.distance, duration: r0.duration,
+    coords: r0.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
     baseline: baselineCost(T, D),
   };
+}
+
+// Com histórico (trechos lentos, buracos, favoritas...): pede alternativas do OSRM para cada trecho entre paradas
+// e fica com a de menor tempo + penalidades (routePenalty, em live.js). O OSRM só dá alternativas para 2 pontos.
+async function osrmLegsLearned(base, ordered) {
+  const jobs = [];
+  for (let i = 0; i + 1 < ordered.length; i++) {
+    const a = ordered[i], b = ordered[i + 1];
+    jobs.push(() => fetchJson(`${base}/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?alternatives=3&overview=full&geometries=geojson&steps=false`));
+  }
+  const res = [];
+  for (let i = 0; i < jobs.length; i += 4) res.push(...await Promise.all(jobs.slice(i, i + 4).map(f => f())));   // 4 por vez
+  const coords = [], legs = [];
+  let distance = 0, duration = 0, learned = false;
+  for (const j of res) {
+    if (j.code !== 'Ok' || !j.routes.length) throw new Error(j.message || j.code);
+    const scored = j.routes.map(r => {
+      const c = r.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+      return { r, c, cost: r.duration + routePenalty(c, r.distance / Math.max(r.duration, 1)) };
+    });
+    const best = scored.reduce((x, y) => (y.cost < x.cost ? y : x));
+    if (best !== scored[0]) learned = true;
+    coords.push(...(coords.length ? best.c.slice(1) : best.c));
+    legs.push(best.r.legs[0]);
+    distance += best.r.distance; duration += best.r.duration;
+  }
+  return { coords, legs, distance, duration, learned };
 }
 
 // Plano B online: ordem escolhida pelo próprio OSRM (aproximada).
@@ -215,8 +259,7 @@ async function osrmTrip(pts, start) {
   const coords = pts.map(p => `${p.lon},${p.lat}`).join(';');
   const url = `https://router.project-osrm.org/trip/v1/driving/${coords}` +
     `?roundtrip=false&source=${start ? 'first' : 'any'}&destination=any&geometries=geojson&overview=full`;
-  const resp = await fetch(url);
-  const j = await resp.json();
+  const j = await fetchJson(url);
   if (j.code !== 'Ok') throw new Error(j.message || j.code);
   const trip = j.trips[0];
   return {
@@ -283,12 +326,9 @@ async function optimize() {
 
   setStatus('Calculando o melhor caminho…');
   let res = null;
-  if (packReady() && hasLearning()) {        // com trechos lentos aprendidos, usa o mapa do aparelho (aplica as penalidades)
-    try { res = await offlineTrip(pts, start); res.learned = true; } catch (e) { res = null; }
-  }
   if (!res) try {
     if (!navigator.onLine) throw new Error('offline');
-    try { res = await osrmBest(pts, start); } catch (e) { res = await osrmTrip(pts, start); }
+    try { res = await osrmBest(pts, start); } catch (e) { if (e.name === 'AbortError') throw e; res = await osrmTrip(pts, start); }
   } catch (e) {
     try {
       res = await offlineTrip(pts, start);   // mapa salvo no aparelho: melhor ordem pelas ruas reais
@@ -399,7 +439,7 @@ async function startRoute(id) {
   if (r.geo) { r.kmPlan = r.geo.distance; await putRoute(r); }
 }
 
-async function endRoute() {
+async function endRoute(auto = false) {      // auto: última entrega feita, finaliza sem perguntar
   const r = session;
   if (!r) return;
   const rs = routeStops(r.id);
@@ -408,7 +448,7 @@ async function endRoute() {
   const avg = dn.length ? dn.reduce((a, s) => a + s.durSec, 0) / dn.length : null;
   const msg = `${feitas} de ${rs.length} entrega(s) em ${fmtClock((Date.now() - r.startedAt) / 1000)}` +
     (avg != null ? ` · média ${fmtClock(avg)}` : '') + '\n\nFinalizar a rota e enviar para o histórico?';
-  if (!confirm(msg)) return;
+  if (!auto && !confirm(msg)) return;
   const gps = r.km || 0;
   Object.assign(r, {
     status: 'finalizada', endedAt: Date.now(), lastPt: null,
@@ -418,6 +458,7 @@ async function endRoute() {
   await putRoute(r);
   await saveLearned();
   await saveTrack();
+  await finishDev();
   stopTrack();
   session = null; lastFix = null; arrived.clear();
   curId = active()[0]?.id || null;
@@ -474,13 +515,14 @@ async function markDone(id, done) {
       await putRoute(session);
     }
     await logDelivery(s, s.doneAt);
+    await finishDev();
   } else {
     delete s.doneAt; delete s.durSec;
     await logDelivery(s, null);
   }
   await DB.put(s);
+  if (done && session && !pending().length && curId === session.id) { await endRoute(true); return; }   // acabaram as paradas
   await buildRoute();
-  if (session && !pending().length && curId === session.id) endRoute();   // acabaram as paradas
 }
 
 async function removeStop(id) {
@@ -535,6 +577,7 @@ async function removeExpense(id) {
 /* ---------- Rota em andamento (cronômetro) ---------- */
 function applySessionUI() {
   document.body.classList.toggle('running', !!session);
+  syncAwake();
   if (!session) document.body.classList.remove('showlist');
   if (session) showTab('routes');
   map.invalidateSize();
@@ -659,7 +702,7 @@ function pinIcon(text, cls = '') {
 
 function drawMe() {
   if (!map || !me) return;
-  if (!meMarker) meMarker = L.marker([me.lat, me.lon], { icon: L.divIcon({ className: '', html: '<div class="pin me"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }), zIndexOffset: 1000 }).addTo(map);
+  if (!meMarker) meMarker = L.marker([me.lat, me.lon], { icon: avatarIcon(), zIndexOffset: 1000 }).addTo(map);
   else meMarker.setLatLng([me.lat, me.lon]);
 }
 
@@ -682,7 +725,7 @@ function renderMap(fit) {
       bounds.push([s.lat, s.lon]);
     });
     if (r.geo) {
-      routeLine = L.polyline(r.geo.coords, { color: '#2563eb', weight: 5, opacity: .8 }).addTo(map);
+      routeLine = L.polyline(r.geo.coords, { color: '#FF6B00', weight: 5, opacity: .85 }).addTo(map);
       bounds.push(...r.geo.coords);
     }
   }
@@ -818,6 +861,8 @@ function bind() {
     fillCostInputs();
     $('packInfo').textContent = packInfo();
     $('learnOn').checked = learnOn;
+    $('keepOn').checked = keepOn;
+    avatarEditorOpen();
     $('learnInfo').textContent = learnInfo();
     sdlg.showModal();
   };
@@ -830,6 +875,10 @@ function bind() {
     city = $('cityS').value.trim();
     pay = { ...pay, ...readCostInputs() };
     learnOn = $('learnOn').checked;
+    keepOn = $('keepOn').checked;
+    avatarEditorSave();
+    await DB.set('keepOn', keepOn);
+    syncAwake();
     await saveProfiles();
     await DB.set('target', target); await DB.set('city', city); await DB.set('pay', pay); await DB.set('learnOn', learnOn);
     sdlg.close();
@@ -860,7 +909,7 @@ function bind() {
   });
   $('exAdd').onclick = addExpense;
 
-  $('btnEnd').onclick = endRoute;
+  $('btnEnd').onclick = () => endRoute();
   $('btnList').onclick = () => { document.body.classList.toggle('showlist'); map.invalidateSize(); render(); };
   $('btnCenter').onclick = () => { follow = true; if (me) map.panTo([me.lat, me.lon]); else getPosition(); };
   map.on('dragstart', () => { follow = false; });
@@ -886,6 +935,7 @@ function bind() {
       else if (act === 'edit') editStop(id);
       else if (act === 'pin') placeOnMap(id);
       else if (act === 'hzdel') removeHazard(id);
+      else if (act === 'favdel') removeFav(id);
       else if (act === 'hmap') openHistory([id]);
       else if (act === 'hmapall') openHistory(finishedInPeriod().map(r => r.id));
       else if (act === 'delx') removeExpense(id);
@@ -928,6 +978,19 @@ async function migrate() {
   }
 }
 
+/* ---------- Tela acesa durante a rota ---------- */
+// Só com a rota iniciada e a opção ligada. O navegador solta o bloqueio ao ir para segundo plano, então pede de novo ao voltar.
+let keepOn = true, wakeLock = null;
+async function syncAwake() {
+  if (!('wakeLock' in navigator)) return;
+  const want = keepOn && !!session;
+  if (!want) { if (wakeLock) { try { await wakeLock.release(); } catch {} wakeLock = null; } return; }
+  if (document.hidden || (wakeLock && !wakeLock.released)) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* sem permissão ou bateria baixa */ }
+}
+document.addEventListener('visibilitychange', syncAwake);
+document.addEventListener('pointerdown', syncAwake);
+
 (async function init() {
   await DB.open();
   stops = await DB.all();
@@ -943,6 +1006,8 @@ async function migrate() {
   geoCache = (await DB.get('geocache')) || {};
   loadPack(await DB.get('pack'));
   await liveInit();
+  await avatarInit();
+  { const k = await DB.get('keepOn'); keepOn = k == null ? true : !!k; }
   me = (await DB.get('lastMe')) || null;      // última posição conhecida: abre já na sua cidade
   daySel = dayKey(Date.now());
 
@@ -957,12 +1022,14 @@ async function migrate() {
 
   bind();
   liveBind();
+  avatarBind();
   histBind();
   document.body.classList.toggle('running', !!session);
   map.invalidateSize();
   drawMe();
   render(!!cur());
   watchPosition();
+  syncAwake();
   updateNet();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist();   // evita o celular apagar os dados
   setInterval(updateRunbar, 1000);

@@ -62,8 +62,8 @@ Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem 
 
 - Mostra **velocidade**, **quanto falta** (km, minutos e hora de chegada) e avisa quando você **chega** na parada.
 - Se você **sai do caminho** por mais de ~8 segundos, a rota é **recalculada sozinha** a partir da sua posição.
-- **⚠ Problema aqui** marca rua esburacada, lombada, semáforo ou trânsito no ponto onde você está. O app também aprende sozinho onde você anda devagar ou para. Esses trechos aparecem em vermelho no mapa e **custam mais** nas próximas rotas.
-- Aplicar os trechos lentos nas rotas exige o **pacote offline** da cidade (o servidor público online não aceita custos próprios). Dá para desligar ou apagar o aprendizado em ⚙.
+- **⚠ Problema aqui** marca rua esburacada, semáforo, trânsito, depressão transversal/drenagem, lombada ou redutor de velocidade no ponto onde você está. Cada marcação vale para ~200 m da mesma via (aparece em vermelho no mapa com o pacote offline). Ordem para evitar: buraco (evitar ao máximo) > semáforo (~60 s) > trânsito > depressão, lombada e redutor. O app também aprende sozinho onde você anda devagar ou para. Esses trechos aparecem em vermelho no mapa e **custam mais** nas próximas rotas.
+- Com internet, a rota vem do OSRM: o app pede até 3 alternativas para cada trecho entre paradas e escolhe a melhor pelo seu histórico (trechos lentos, problemas marcados, vias favoritas). O mapa salvo no aparelho (pacote offline) só entra quando a internet cai ou oscila (mais de 8 s sem resposta), e nesse caso aplica os mesmos custos. Dá para desligar ou apagar o aprendizado em ⚙.
 
 ### Períodos de trabalho (manhã, noite…)
 

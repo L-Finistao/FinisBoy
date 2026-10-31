@@ -1,12 +1,13 @@
 'use strict';
 
 /* Trajeto gravado durante a rota e histórico no mapa:
-   - grava a posição do GPS (a cada ~12 m ou 15 s) junto com o horário;
+   - grava a posição do GPS (a cada ~6 m ou 10 s) junto com o horário e a velocidade do GPS;
+   - no histórico encaixa o trajeto nas ruas (map matching) para seguir as ruas realmente percorridas;
    - no histórico mostra o trajeto colorido pela velocidade e compara os trechos entre as entregas, parte a parte.
    Usa as globais de app.js (routes, stops, deliveries, map, DB, pinIcon, fmt*...). */
 
 /* ---------- Gravação do trajeto ---------- */
-let track = [];                 // [[lat, lon, horário], ...] da rota em andamento
+let track = [];                 // [[lat, lon, horário, km/h do GPS], ...] da rota em andamento
 let trackId = null, trackDirty = false;
 
 function startTrack(id) { track = []; trackId = id; trackDirty = true; }
@@ -20,11 +21,13 @@ async function resumeTrack(id) {
 }
 
 function recordTrack(p) {
-  if (p.coords.accuracy > 50 || !trackId) return;          // GPS impreciso: ignora
+  if (p.coords.accuracy > 30 || !trackId) return;          // GPS impreciso: ignora
   const t = p.timestamp || Date.now();
-  const pt = [+p.coords.latitude.toFixed(6), +p.coords.longitude.toFixed(6), t];
+  const sp = p.coords.speed != null && p.coords.speed >= 0 ? Math.round(p.coords.speed * 3.6) : null;
+  const pt = [+p.coords.latitude.toFixed(6), +p.coords.longitude.toFixed(6), t, sp];
   const last = track[track.length - 1];
-  if (!last || haversine({ lat: last[0], lon: last[1] }, { lat: pt[0], lon: pt[1] }) >= 12 || t - last[2] >= 15000) {
+  const moved = last ? haversine({ lat: last[0], lon: last[1] }, { lat: pt[0], lon: pt[1] }) : Infinity;
+  if (!last || (moved >= 6 && t - last[2] >= 1000) || t - last[2] >= 10000) {
     track.push(pt);
     trackDirty = true;
   }
@@ -79,6 +82,80 @@ function segmentsOf(r, pts) {
   return segs;
 }
 
+/* ---------- Encaixe nas ruas (OSRM match) ---------- */
+// O GPS "corta" esquinas e treme parado; o OSRM devolve cada ponto já em cima da rua em que o carro estava.
+async function snapTrack(pts, say) {
+  const out = pts.map(p => [p[0], p[1]]);
+  const base = 'https://router.project-osrm.org/match/v1/driving/';
+  let i = 0, done = 0;
+  while (i < pts.length) {
+    const idx = [i];
+    while (idx.length < 100 && i + 1 < pts.length && pts[i + 1][2] - pts[i][2] <= 90000) {
+      i++;
+      if (Math.floor(pts[i][2] / 1000) > Math.floor(pts[idx[idx.length - 1]][2] / 1000)) idx.push(i);   // horários crescentes
+    }
+    i++;
+    if (idx.length >= 2) {
+      const url = base + idx.map(k => pts[k][1] + ',' + pts[k][0]).join(';') +
+        '?overview=false&gaps=split&tracepoints=true&radiuses=' + idx.map(() => 30).join(';') +
+        '&timestamps=' + idx.map(k => Math.floor(pts[k][2] / 1000)).join(';');
+      const j = await (await fetch(url)).json();
+      if (j.code === 'Ok') j.tracepoints.forEach((tp, n) => { if (tp && tp.location) out[idx[n]] = [tp.location[1], tp.location[0]]; });
+    }
+    done = Math.min(i, pts.length);
+    if (say) say(done, pts.length);
+  }
+  return out;
+}
+
+async function snapRoute(id) {
+  const raw = hist.raw[id];
+  if (!raw || raw.length < 2) return;
+  const key = 'snap_' + id;
+  let snap = await DB.get(key);
+  if (!snap || snap.n !== raw.length) {
+    $('hvNote').textContent = 'Ajustando o trajeto às ruas (0%)…';
+    try {
+      const pts = await snapTrack(raw, (d, n) => { if (hist) $('hvNote').textContent = `Ajustando o trajeto às ruas (${Math.round(d / n * 100)}%)…`; });
+      snap = { n: raw.length, pts };
+      await DB.set(key, snap);
+    } catch { if (hist) renderHistPanel(); return; }          // sem internet: continua com o GPS bruto
+  }
+  if (!hist || !hist.ids.includes(id)) return;
+  hist.tracks[id] = raw.map((p, k) => [snap.pts[k][0], snap.pts[k][1], p[2], p[3]]);
+  hist.snapped = true;
+  hist.dirty = true;
+  renderHistPanel();
+  drawHistory(false);
+}
+
+/* ---------- Trechos lentos e rápidos (para escolher vias de alta e baixa velocidade) ---------- */
+const FAST_KMH = 40;
+const ptKmh = (a, b) => {
+  const dt = (b[2] - a[2]) / 1000;
+  if (b[3] != null && dt <= 20) return b[3];                         // velocidade medida pelo GPS
+  return dt > 0 ? haversine(ptObj(a), ptObj(b)) / dt * 3.6 : 0;
+};
+
+function speedRuns(r, pts) {
+  const marks = deliveredStops(r);
+  const nearStop = p => marks.some(s => haversine(ptObj(p), s) < 40);      // parar para entregar não é problema da via
+  const runs = [];
+  let cur = null;
+  const close = () => { if (cur) runs.push(cur); cur = null; };
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], dt = (b[2] - a[2]) / 1000;
+    if (dt <= 0 || dt > 90 || nearStop(b)) { close(); continue; }
+    const v = ptKmh(a, b), kind = v < 5 ? 'parado' : v < 15 ? 'lento' : v >= FAST_KMH ? 'rapido' : null;
+    if (!kind) { close(); continue; }
+    if (!cur || cur.kind !== kind) { close(); cur = { kind, pts: [[a[0], a[1]]], dist: 0, sec: 0 }; }
+    cur.pts.push([b[0], b[1]]);
+    cur.dist += haversine(ptObj(a), ptObj(b)); cur.sec += dt;
+  }
+  close();
+  return runs.filter(x => (x.kind === 'parado' ? x.sec >= 8 : x.dist >= 40)).map(x => ({ ...x, kmh: x.sec ? x.dist / x.sec * 3.6 : 0 }));
+}
+
 /* ---------- Visualização no mapa ---------- */
 let hist = null;                // { ids, single, tracks, segs, focus, dirty, prevTab }
 let histLayer = null;
@@ -92,10 +169,11 @@ async function openHistory(ids) {
   if (!ids.length) return;
   const tracks = {};
   for (const id of ids) { const t = await DB.getOf('tracks', id); tracks[id] = t ? t.pts : []; }
-  hist = { ids, single: ids.length === 1, tracks, segs: [], focus: null, dirty: true, prevTab: tab };
+  hist = { ids, single: ids.length === 1, tracks, raw: { ...tracks }, runs: [], snapped: false, segs: [], focus: null, dirty: true, prevTab: tab };
   document.body.classList.add('histview');
   showTab('routes', true);
   renderHistPanel();
+  if (hist.single) snapRoute(ids[0]);
 }
 
 function closeHistory(rerender = true) {
@@ -113,7 +191,7 @@ function drawTrack(pts, weight, cv, bounds) {
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i], dt = (b[2] - a[2]) / 1000;
     if (dt <= 0 || dt > 90) { run = null; continue; }                // sinal de GPS perdido: não liga os pontos
-    const band = speedBand(haversine(ptObj(a), ptObj(b)) / dt * 3.6);
+    const band = speedBand(ptKmh(a, b));
     if (run && run.band === band) run.pts.push([b[0], b[1]]);
     else runs.push(run = { band, pts: [[a[0], a[1]], [b[0], b[1]]] });
   }
@@ -140,6 +218,8 @@ function drawHistory(fit) {
     if (seg && seg.sub.length > 1) {                                  // destaque do trecho escolhido
       L.polyline(seg.sub.map(p => [p[0], p[1]]), { color: '#111827', weight: 12, opacity: 0.35, renderer: cv, interactive: false }).addTo(histLayer);
     }
+    const run = hist.single && hist.runFocus != null ? hist.runs[hist.runFocus] : null;
+    if (run) L.polyline(run.pts, { color: '#111827', weight: 14, opacity: 0.35, renderer: cv, interactive: false }).addTo(histLayer);
     drawTrack(pts, hist.single ? 6 : 3, cv, bounds);
 
     const done = deliveredStops(r);
@@ -162,6 +242,15 @@ function drawHistory(fit) {
     }
   }
   if (fit && bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+}
+
+function focusRun(i) {
+  if (!hist || !hist.single) return;
+  hist.runFocus = hist.runFocus === i ? null : i;
+  drawHistory(false);
+  const run = hist.runs[i];
+  if (hist.runFocus != null && run) map.fitBounds(run.pts, { padding: [40, 40], maxZoom: 18 });
+  document.querySelectorAll('#runList [data-run]').forEach(li => li.classList.toggle('focus', +li.dataset.run === hist.runFocus));
 }
 
 function focusSegment(i) {
@@ -188,6 +277,7 @@ function renderHistPanel() {
     $('hvSummary').innerHTML = cards([['Rotas', rs.length], ['Entregas no mapa', dels], ['Km rodados', km ? fmtKm(km) : '—']]);
     $('hvNote').textContent = 'Cada ponto laranja é uma entrega; as linhas coloridas mostram a velocidade. Toque numa rota para ver parte a parte.';
     $('hvSegTitle').textContent = 'Rotas';
+    $('hvRunTitle').hidden = true; $('runList').innerHTML = '';
     $('segList').innerHTML = rs.map(r => `<li class="seg" data-open="${r.id}"><div class="sg-top"><b>${esc(r.name)}</b><span class="sg-t">${fmtDay(dayKey(r.endedAt))} ${fmtTime(r.startedAt)}–${fmtTime(r.endedAt)}</span></div>
       <div class="sg-meta">${deliveredStops(r).length} entrega(s) · ${fmtKm(kmOf(r))} · ${fmtDur((r.endedAt - r.startedAt) / 1000)}</div></li>`).join('');
     return;
@@ -211,9 +301,19 @@ function renderHistPanel() {
     ['Velocidade rodando', moving ? (dist / moving * 3.6).toFixed(0) + ' km/h' : '—'], ['Mais lento', slow ? `${slow.from.stop ? slow.n - 1 : 'Saída'} → ${slow.n}` : '—'],
   ]);
   $('hvNote').textContent = pts.length
-    ? 'Toque numa parte para destacá-la no mapa. A barra mostra o tempo por km: quanto maior, mais lento o trecho.'
+    ? (hist.snapped ? 'Trajeto ajustado às ruas. ' : 'Mostrando o GPS bruto (sem internet para ajustar às ruas). ') +
+      'Toque numa parte para destacá-la no mapa. A barra mostra o tempo por km: quanto maior, mais lento o trecho.'
     : 'Esta rota não tem trajeto gravado (foi feita antes desta versão ou sem GPS). Mostrando só as entregas e os tempos.';
   $('hvSegTitle').textContent = 'Parte a parte';
+
+  const runs = hist.runs = speedRuns(r, pts);
+  const slowRuns = runs.filter(x => x.kind !== 'rapido').sort((a, b) => b.sec - a.sec).slice(0, 10);
+  const fastRuns = runs.filter(x => x.kind === 'rapido').sort((a, b) => b.dist - a.dist).slice(0, 5);
+  const RUN_LABEL = { parado: '🛑 Parado', lento: '🐢 Lento', rapido: '🐇 Rápido' };
+  $('hvRunTitle').hidden = !runs.length;
+  $('runList').innerHTML = [...slowRuns, ...fastRuns].map(x =>
+    `<li class="seg" data-run="${runs.indexOf(x)}"><div class="sg-top"><b>${RUN_LABEL[x.kind]}</b><span class="sg-t">${fmtClock(x.sec)}</span></div>
+      <div class="sg-meta">${x.dist < 1000 ? Math.round(x.dist) + ' m' : fmtKm(x.dist / 1000)} · ${x.kmh.toFixed(0)} km/h na média · semáforo, buraco, lombada ou trânsito?</div></li>`).join('');
 
   const maxPace = paced.length ? Math.max(...paced.map(s => s.pace)) : 0;
   $('segList').innerHTML = segs.map(s => {
@@ -232,6 +332,10 @@ function renderHistPanel() {
 
 function histBind() {
   $('hvBack').onclick = () => { if (hist) showTab(hist.prevTab); };
+  $('runList').onclick = e => {
+    const li = e.target.closest('[data-run]');
+    if (li) focusRun(+li.dataset.run);
+  };
   $('segList').onclick = e => {
     const li = e.target.closest('[data-seg]');
     if (li) { focusSegment(+li.dataset.seg); return; }

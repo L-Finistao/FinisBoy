@@ -58,6 +58,8 @@
         <p id="hvNote" class="muted"></p>
         <h2 class="sec" id="hvSegTitle">Parte a parte</h2>
         <ol id="segList"></ol>
+        <h2 class="sec" id="hvRunTitle" hidden>Trechos lentos e rápidos</h2>
+        <ol id="runList"></ol>
       </section>
 
       <section id="next" hidden></section>
@@ -199,9 +201,14 @@
       </label>
       <div id="costPreview" class="preview"></div>
 
+      <h3>Meu personagem no mapa</h3>
+      <div id="avKinds" class="av-grid"></div>
+      <div id="avColors" class="av-colors"></div>
+
       <h3>Trechos lentos</h3>
+      <label class="check"><input type="checkbox" id="keepOn"> Manter a tela acesa durante a rota</label>
       <label class="check"><input type="checkbox" id="learnOn"> Evitar trechos lentos (aprendidos pelo GPS e marcados por mim)</label>
-      <p class="muted">Durante as rotas o app anota onde você anda devagar ou para (buraco, lombada, semáforo, trânsito). Precisa do pacote offline da cidade para aplicar nas rotas.</p>
+      <p class="muted">Durante as rotas o app anota onde você anda devagar ou para (buraco, lombada, semáforo, trânsito).</p>
       <p class="muted" id="learnInfo"></p>
       <button type="button" id="btnLearnDel" class="danger">Apagar o que foi aprendido</button>
 
@@ -223,15 +230,18 @@
     <p class="muted">As próximas rotas evitam este trecho. Toque num marcador do mapa para remover.</p>
     <div class="hzgrid">
       <button data-hz="buraco">🕳️ Rua esburacada</button>
-      <button data-hz="lombada">🚧 Lombada</button>
       <button data-hz="semaforo">🚦 Semáforo</button>
       <button data-hz="transito">🚗 Trânsito / muito carro</button>
+      <button data-hz="depressao">〰️ Depressão transversal / drenagem</button>
+      <button data-hz="lombada">🚧 Lombada</button>
+      <button data-hz="redutor">🐢 Redutor de velocidade</button>
     </div>
     <div class="row"><button id="hzCancel">Cancelar</button></div>
   </dialog>
 
   <script src="vendor/leaflet.js"></script>
   <script src="offline.js"></script>
+  <script src="avatar.js"></script>
   <script src="live.js"></script>
   <script src="earnings.js"></script>
   <script src="history.js"></script>
