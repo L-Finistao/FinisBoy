@@ -12,10 +12,10 @@ const DB = (() => {
   const store = (name, mode = 'readonly') => db.transaction(name, mode).objectStore(name);
   return {
     open: () => new Promise((res, rej) => {
-      const r = indexedDB.open('motoboy', 3);
+      const r = indexedDB.open('motoboy', 4);
       r.onupgradeneeded = () => {
         const d = r.result;
-        for (const n of ['stops', 'deliveries', 'expenses', 'routes']) if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: 'id' });
+        for (const n of ['stops', 'deliveries', 'expenses', 'routes', 'tracks']) if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: 'id' });
         if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
       };
       r.onsuccess = () => { db = r.result; res(); };
@@ -25,6 +25,7 @@ const DB = (() => {
     put: s => req(store('stops', 'readwrite').put(s)),
     del: id => req(store('stops', 'readwrite').delete(id)),
     allOf: n => req(store(n).getAll()),
+    getOf: (n, id) => req(store(n).get(id)),
     putOf: (n, o) => req(store(n, 'readwrite').put(o)),
     delOf: (n, id) => req(store(n, 'readwrite').delete(id)),
     get: k => req(store('kv').get(k)),
@@ -160,11 +161,11 @@ function trackKm(p) {
 function setMe(p) {
   me = { lat: p.coords.latitude, lon: p.coords.longitude };
   drawMe();
-  if (session) { trackKm(p); learnFix(p); liveProgress(p); }
+  if (session) { trackKm(p); learnFix(p); recordTrack(p); liveProgress(p); }
   if (Date.now() - lastSaved > 10000) {
     lastSaved = Date.now();
     DB.set('lastMe', me);
-    if (session) { putRoute(session); saveLearned(); }
+    if (session) { putRoute(session); saveLearned(); saveTrack(); }
   }
   if (!centered) {                       // primeira posição: mostra a cidade inteira, sem precisar de zoom
     centered = true;
@@ -347,7 +348,7 @@ async function run(fn, { fit = true } = {}) {
 const buildRoute = (fit = true) => run(async () => { await geocodeAll(); await optimize(); }, { fit });
 
 // Cada colagem de endereços vira uma rota nova, que pode ser iniciada separadamente.
-async function addFromText(text) {
+async function addFromText(text, profileId) {
   const addrs = parseText(text);
   if (!addrs.length) { setStatus('Nenhum endereço encontrado no texto.', 4000); return; }
   // Alguns endereços vêm sem a UF ("Birigui" em vez de "Birigui - SP"): completa com a UF mais comum da lista.
@@ -357,9 +358,15 @@ async function addFromText(text) {
     for (const a of addrs) if (a.cityGuess && !/ - [A-Z]{2}$/.test(a.cityGuess)) a.cityGuess += ' - ' + top;
     if (!geoCache._uf) geoCache._uf = top;
   }
+  // Endereço sem cidade nenhuma ("Luiz de Oliveis"): usa a cidade mais comum da lista (ou a cidade padrão).
+  const cities = addrs.map(a => a.cityGuess).filter(Boolean);
+  if (cities.length && !city) {
+    const topCity = cities.sort((a, b) => cities.filter(x => x === b).length - cities.filter(x => x === a).length)[0];
+    for (const a of addrs) if (!a.cityGuess) a.cityGuess = topCity;
+  }
   const seq = ((await DB.get('routeSeq')) || 0) + 1;
   await DB.set('routeSeq', seq);
-  const r = { id: newId(), name: 'Rota ' + seq, createdAt: Date.now(), status: 'pendente', km: 0 };
+  const r = { id: newId(), name: 'Rota ' + seq, createdAt: Date.now(), status: 'pendente', km: 0, profileId: normPid(profileId || defaultProfileId()) };
   routes.push(r);
   await putRoute(r);
   for (const [i, a] of addrs.entries()) {
@@ -386,6 +393,7 @@ async function startRoute(id) {
   Object.assign(r, { status: 'andamento', startedAt: now, legStartedAt: now, km: 0, lastPt: null });
   await putRoute(r);
   session = r; curId = r.id; follow = true;
+  startTrack(r.id);
   applySessionUI();
   await buildRoute();        // recalcula a partir de onde você está e enquadra o mapa
   if (r.geo) { r.kmPlan = r.geo.distance; await putRoute(r); }
@@ -409,6 +417,8 @@ async function endRoute() {
   });
   await putRoute(r);
   await saveLearned();
+  await saveTrack();
+  stopTrack();
   session = null; lastFix = null; arrived.clear();
   curId = active()[0]?.id || null;
   applySessionUI();
@@ -424,6 +434,7 @@ async function deleteRoute(id) {
   for (const s of routeStops(id)) await DB.del(s.id);
   for (const d of deliveries.filter(x => x.routeId === id)) await DB.delOf('deliveries', d.id);
   await DB.delOf('routes', id);
+  await DB.delOf('tracks', id);
   stops = stops.filter(s => s.routeId !== id);
   deliveries = deliveries.filter(d => d.routeId !== id);
   routes = routes.filter(x => x.id !== id);
@@ -489,108 +500,7 @@ async function editStop(id) {
   await buildRoute();
 }
 
-/* ---------- Ganhos ---------- */
-// Ganho bruto de um dia com n entregas. Fixo = valor por dia trabalhado (dia com ao menos 1 entrega).
-function dayGain(n) {
-  if (!n) return 0;
-  return (pay.mode !== 'fixo' ? n * pay.perDelivery : 0) + (pay.mode !== 'entrega' ? pay.fixed : 0);
-}
-
-const kmOf = r => (r.kmFinal || 0) / 1000;
-
-// O fixo do dia é rateado entre as rotas do dia, proporcional às entregas de cada uma.
-function routeStats(r) {
-  const n = deliveries.filter(d => d.routeId === r.id).length;
-  const dayN = deliveries.filter(d => dayKey(d.doneAt) === dayKey(r.endedAt)).length;
-  const gain = (pay.mode !== 'fixo' ? n * pay.perDelivery : 0) + (pay.mode !== 'entrega' && dayN ? pay.fixed * n / dayN : 0);
-  const km = kmOf(r);
-  const cost = km * costPerKm();
-  return { n, total: routeStops(r.id).length, gain, km, cost, net: gain - cost, sec: (r.endedAt - r.startedAt) / 1000 };
-}
-
-function periodStart(p) {
-  const d = new Date(); d.setHours(0, 0, 0, 0);
-  if (p === 'tudo') return 0;
-  if (p === 'semana') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // segunda-feira
-  if (p === 'mes') d.setDate(1);
-  return d.getTime();
-}
-
-function todayGross() {
-  const k = dayKey(Date.now());
-  return dayGain(deliveries.filter(d => dayKey(d.doneAt) === k).length);
-}
-
-const cards = items => items.map(([l, v, c = '']) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('');
-const noKm = '—';
-
-function renderDay() {
-  const k = daySel;
-  $('dDate').value = k;
-  const dl = deliveries.filter(d => dayKey(d.doneAt) === k);
-  const fin = routes.filter(r => r.status === 'finalizada' && dayKey(r.endedAt) === k).sort((a, b) => a.endedAt - b.endedAt);
-  const ex = expenses.filter(e => dayKey(e.date) === k);
-  const km = fin.reduce((a, r) => a + kmOf(r), 0);
-  const sec = fin.reduce((a, r) => a + (r.endedAt - r.startedAt) / 1000, 0);
-  const gross = dayGain(dl.length);
-  const spent = ex.reduce((a, e) => a + e.valor, 0);
-  const net = gross - spent;
-  const timed = stops.filter(s => s.durSec != null && s.doneAt && dayKey(s.doneAt) === k);
-  const avg = timed.length ? timed.reduce((a, s) => a + s.durSec, 0) / timed.length : null;
-
-  $('dSum').innerHTML = cards([
-    ['Entregas', dl.length], ['Rotas finalizadas', fin.length],
-    ['Km rodados', km ? fmtKm(km) : noKm], ['Tempo em rota', sec ? fmtDur(sec) : noKm],
-    ['Ganho bruto', money(gross)], ['Gastos', money(spent), 'neg'],
-    ['Líquido', money(net), net < 0 ? 'neg' : 'pos'], ['Média por entrega', avg != null ? fmtClock(avg) : noKm],
-    ['Ganho por km', km ? money(gross / km) : noKm], ['Custo por km', km ? money(spent / km) : noKm],
-  ]);
-
-  $('dRoutes').innerHTML = fin.map(r => {
-    const st = routeStats(r);
-    return `<li><span>${fmtTime(r.startedAt)}–${fmtTime(r.endedAt)}</span><span>${esc(r.name)} · ${st.n} entrega(s) · ${fmtKm(st.km)}</span><span>${money(st.gain)}</span></li>`;
-  }).join('') || '<li class="muted">Nenhuma rota finalizada neste dia.</li>';
-
-  $('dExp').innerHTML = ex.sort((a, b) => b.date - a.date).map(e =>
-    `<li><span></span><span>${esc(e.cat)}${e.desc ? ' · ' + esc(e.desc) : ''}</span><span class="neg">${money(e.valor)}</span>
-      <button data-act="delx" data-id="${e.id}">🗑</button></li>`).join('') || '<li class="muted">Nenhum gasto neste dia.</li>';
-}
-
-function renderHist() {
-  const from = periodStart($('hPeriod').value);
-  const fin = routes.filter(r => r.status === 'finalizada' && r.endedAt >= from).sort((a, b) => b.endedAt - a.endedAt);
-  const ids = new Set(fin.map(r => r.id));
-  const dl = deliveries.filter(d => d.doneAt >= from);
-  const ex = expenses.filter(e => e.date >= from);
-
-  const days = {};
-  dl.forEach(d => { const k = dayKey(d.doneAt); days[k] = (days[k] || 0) + 1; });
-  const gross = Object.values(days).reduce((a, n) => a + dayGain(n), 0);
-  const km = fin.reduce((a, r) => a + kmOf(r), 0);
-  const spent = ex.reduce((a, e) => a + e.valor, 0);
-  const net = gross - spent;
-
-  $('hSum').innerHTML = cards([
-    ['Rotas', fin.length], ['Entregas', dl.length],
-    ['Km rodados', km ? fmtKm(km) : noKm], ['Ganho bruto', money(gross)],
-    ['Gastos', money(spent), 'neg'], ['Líquido', money(net), net < 0 ? 'neg' : 'pos'],
-    ['Ganho por km', km ? money(gross / km) : noKm], ['Custo por km', km ? money(spent / km) : noKm],
-  ]);
-
-  $('hList').innerHTML = fin.map(r => {
-    const st = routeStats(r);
-    const addr = routeStops(r.id).sort((a, b) => (a.doneAt || 0) - (b.doneAt || 0))
-      .map(s => `<li class="${s.done ? '' : 'miss'}">${s.done ? '✓' : '✗'} ${esc(s.raw)}${s.durSec != null ? ` <span class="muted">(${fmtClock(s.durSec)})</span>` : ''}</li>`).join('');
-    return `<details class="hrow"><summary>
-        <span class="hn">${esc(r.name)}</span>
-        <span class="muted">${fmtDay(dayKey(r.endedAt))} ${fmtTime(r.startedAt)}–${fmtTime(r.endedAt)}</span>
-        <span>${st.n}/${st.total} entregas · ${r.kmSrc === 'plan' ? '~' : ''}${fmtKm(st.km)}</span>
-        <span><b>${money(st.gain)}</b>${costPerKm() ? ` · custo ${money(st.cost)} · <b class="${st.net < 0 ? 'neg' : 'pos'}">${money(st.net)}</b>` : ''}</span>
-        <span class="muted">${st.km ? money(st.gain / st.km) + '/km' : ''}${costPerKm() ? ' · custo ' + money(costPerKm()) + '/km' : ''}${pay.kmPerL && st.km ? ' · ~' + (st.km / pay.kmPerL).toFixed(1).replace('.', ',') + ' L' : ''} · ${fmtDur(st.sec)}</span>
-      </summary>
-      <div class="hbody"><ul>${addr}</ul><button class="danger" data-act="rdel" data-id="${r.id}">🗑 Apagar rota</button></div></details>`;
-  }).join('') || '<p class="muted">Nenhuma rota finalizada neste período. Inicie uma rota e finalize-a para ela aparecer aqui.</p>';
-}
+/* Ganhos, períodos de trabalho, tela Dia e Histórico: ver earnings.js */
 
 const COST_FIELDS = { fuelPrice: 'fuelPrice', kmPerL: 'kmPerL', oilPrice: 'oilPrice', oilKm: 'oilKm', otherKm: 'otherKm' };
 
@@ -614,21 +524,6 @@ function previewCost() {
   $('costPreview').innerHTML = tot
     ? `<b>${money(tot)}/km</b> <span class="muted">(gasolina ${money(c.fuel)} + óleo ${money(c.oil)}${c.other ? ' + outros ' + money(c.other) : ''})</span>`
     : '<span class="muted">Preencha para ver o custo por km.</span>';
-}
-
-function syncPayInputs() {
-  $('payPerWrap').hidden = $('payMode').value === 'fixo';
-  $('payFixedWrap').hidden = $('payMode').value === 'entrega';
-}
-
-async function addExpense() {
-  const valor = parseMoney($('exValor').value);
-  if (valor <= 0) { $('exValor').focus(); return; }
-  const e = { id: newId(), date: new Date(daySel + 'T12:00').getTime(), valor, cat: $('exCat').value, desc: $('exDesc').value.trim() };
-  expenses.push(e);
-  await DB.putOf('expenses', e);
-  $('exValor').value = ''; $('exDesc').value = '';
-  renderDay();
 }
 
 async function removeExpense(id) {
@@ -663,7 +558,7 @@ function updateRunbar() {
   $('rbTotal').textContent = '⏱ ' + fmtClock((now - session.startedAt) / 1000);
   $('rbAvg').textContent = avg != null ? `média ${fmtClock(avg)} (${dn.length})` : '';
   $('rbAvg').className = avg != null && lim && avg > lim ? 'late' : '';
-  $('rbMoney').textContent = pay.perDelivery || pay.fixed ? '💰 hoje ' + money(todayGross()) : '';
+  $('rbMoney').textContent = profiles.some(p => p.perDelivery || p.fixed) ? '💰 hoje ' + money(todayGross()) : '';
 }
 
 /* ---------- Offline ---------- */
@@ -769,6 +664,10 @@ function drawMe() {
 }
 
 function renderMap(fit) {
+  if (hist) {                                   // visualizando o histórico: o mapa mostra o trajeto feito
+    if (fit || hist.dirty) drawHistory(fit);
+    return;
+  }
   markersLayer.clearLayers();
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   const r = cur();
@@ -808,6 +707,7 @@ function renderRoutes() {
     return `<li class="rcard ${r.id === curId ? 'sel' : ''} ${r.status}" data-rid="${r.id}">
       <div class="rtop"><b>${esc(r.name)}</b><span class="badge ${r.status}">${em ? '● Em andamento' : 'Pendente'}</span></div>
       <div class="muted">${info}</div>
+      <label class="rprof">Período <select data-rprof="${r.id}">${profileOptions(routePid(r))}</select></label>
       <div class="btns">
         ${em ? '' : `<button class="primary" data-act="rstart" data-id="${r.id}" ${session ? 'disabled' : ''}>▶ Iniciar</button>`}
         ${em ? '' : `<button class="danger" data-act="rdel" data-id="${r.id}">🗑</button>`}
@@ -874,7 +774,8 @@ function render(fit = false) {
   if (tab === 'hist') renderHist();
 }
 
-function showTab(name) {
+function showTab(name, keepHist = false) {
+  if (hist && !keepHist) closeHistory(false);   // saiu do histórico no mapa
   tab = name;
   $('viewRoutes').hidden = name !== 'routes';
   $('viewDay').hidden = name !== 'day';
@@ -894,36 +795,42 @@ function shiftDay(delta) {
 
 function bind() {
   const dlg = $('addDlg');
-  $('btnAdd').onclick = () => { $('city').value = city; $('txt').value = ''; dlg.showModal(); $('txt').focus(); };
+  $('btnAdd').onclick = () => {
+    $('city').value = city; $('txt').value = '';
+    $('routeProfile').innerHTML = profileOptions(defaultProfileId());      // período pelo horário (ou o último usado)
+    dlg.showModal(); $('txt').focus();
+  };
   $('btnCancel').onclick = () => dlg.close();
   $('addForm').onsubmit = async () => {
     city = $('city').value.trim();
     await DB.set('city', city);
     const text = $('txt').value;
+    const pid = $('routeProfile').value;
+    lastProfileId = pid; await DB.set('lastProfile', pid);
     dlg.close();
-    addFromText(text);
+    addFromText(text, pid);
   };
 
   const sdlg = $('setDlg');
   $('btnSet').onclick = () => {
     $('target').value = target; $('cityS').value = city;
-    $('payMode').value = pay.mode;
-    $('payPer').value = pay.perDelivery || ''; $('payFixed').value = pay.fixed || ''; fillCostInputs();
-    syncPayInputs();
+    openProfileEditor();
+    fillCostInputs();
     $('packInfo').textContent = packInfo();
     $('learnOn').checked = learnOn;
     $('learnInfo').textContent = learnInfo();
     sdlg.showModal();
   };
   $('btnLearnDel').onclick = async () => { if (!confirm('Apagar tudo o que o app aprendeu e as suas marcações de problemas?')) return; await clearLearned(); $('learnInfo').textContent = learnInfo(); };
-  $('payMode').onchange = syncPayInputs;
+  profileEditorBind();
   for (const k in COST_FIELDS) $(k).oninput = previewCost;
   $('setCancel').onclick = () => sdlg.close();
   $('setForm').onsubmit = async () => {
     target = Math.max(0, parseInt($('target').value, 10) || 0);
     city = $('cityS').value.trim();
-    pay = { mode: $('payMode').value, perDelivery: parseMoney($('payPer').value), fixed: parseMoney($('payFixed').value), ...readCostInputs() };
+    pay = { ...pay, ...readCostInputs() };
     learnOn = $('learnOn').checked;
+    await saveProfiles();
     await DB.set('target', target); await DB.set('city', city); await DB.set('pay', pay); await DB.set('learnOn', learnOn);
     sdlg.close();
     drawLearned();
@@ -936,6 +843,21 @@ function bind() {
   $('dToday').onclick = () => { daySel = dayKey(Date.now()); renderDay(); };
   $('dDate').onchange = () => { if ($('dDate').value) { daySel = $('dDate').value; renderDay(); } };
   $('hPeriod').onchange = renderHist;
+  $('hProf').onchange = renderHist;
+  $('dRange').onchange = renderDaily;
+  $('dDaily').onclick = e => {                                    // tocar num dia da lista abre esse dia
+    const li = e.target.closest('[data-day]');
+    if (li) { daySel = li.dataset.day; renderDay(); $('viewDay').scrollTop = 0; }
+  };
+  document.body.addEventListener('change', async e => {           // trocar o período de uma rota
+    const sel = e.target.closest('select[data-rprof]');
+    if (!sel) return;
+    const r = routes.find(x => x.id === sel.dataset.rprof);
+    if (!r) return;
+    r.profileId = sel.value;
+    await putRoute(r);
+    render();
+  });
   $('exAdd').onclick = addExpense;
 
   $('btnEnd').onclick = endRoute;
@@ -964,6 +886,8 @@ function bind() {
       else if (act === 'edit') editStop(id);
       else if (act === 'pin') placeOnMap(id);
       else if (act === 'hzdel') removeHazard(id);
+      else if (act === 'hmap') openHistory([id]);
+      else if (act === 'hmapall') openHistory(finishedInPeriod().map(r => r.id));
       else if (act === 'delx') removeExpense(id);
       else if (act === 'rstart') startRoute(id);
       else if (act === 'rdel') deleteRoute(id);
@@ -1015,6 +939,7 @@ async function migrate() {
   const t = await DB.get('target');
   if (t != null) target = t;
   pay = { ...pay, ...((await DB.get('pay')) || {}) };
+  await loadProfiles();
   geoCache = (await DB.get('geocache')) || {};
   loadPack(await DB.get('pack'));
   await liveInit();
@@ -1022,6 +947,7 @@ async function migrate() {
   daySel = dayKey(Date.now());
 
   session = routes.find(r => r.status === 'andamento') || null;
+  if (session) await resumeTrack(session.id);
   curId = session?.id || active()[0]?.id || null;
 
   const start = me ? [me.lat, me.lon] : [-14.2, -51.9];
@@ -1031,6 +957,7 @@ async function migrate() {
 
   bind();
   liveBind();
+  histBind();
   document.body.classList.toggle('running', !!session);
   map.invalidateSize();
   drawMe();

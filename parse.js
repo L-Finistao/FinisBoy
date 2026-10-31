@@ -128,27 +128,34 @@ function addrFields(s) {
 async function resolveStreet(f, userCep) {
   const cands = [];
   const base = stripType(f.street);
+  const nb = norm(f.bairro);
+  const digits = String(userCep || '').replace(/\D/g, '');
+  const score = c => {
+    let sc = similarity(base, stripType(c.logradouro));
+    if (nb && c.bairro && (norm(c.bairro).includes(nb) || nb.includes(norm(c.bairro)))) sc += 0.15;
+    if (digits && c.cep && c.cep.replace(/\D/g, '') === digits) sc += 0.1;
+    return sc;
+  };
+  const pickBest = () => {
+    let best = null, bs = 0;
+    for (const c of cands) { const sc = score(c); if (sc > bs) { bs = sc; best = c; } }
+    return { best, bs };
+  };
+
   if (f.uf && f.city && base.length >= 3) {
-    const longest = base.split(' ').sort((a, b) => b.length - a.length)[0];
-    for (const term of [...new Set([base, longest])]) {
-      if (!term || term.length < 3) continue;
+    // frase inteira; se não achar, cada palavra (a maior primeiro): uma palavra errada ("Teixrita") não atrapalha as outras
+    const words = [...new Set(base.split(' '))].filter(w => w.length >= 3).sort((a, b) => b.length - a.length).slice(0, 3);
+    for (const term of [...new Set([base, ...words])]) {
       const list = await getJSON(`https://viacep.com.br/ws/${f.uf}/${encodeURIComponent(norm(f.city))}/${encodeURIComponent(term)}/json/`, 'cep', 150);
-      if (Array.isArray(list) && list.length) { cands.push(...list); break; }
+      if (Array.isArray(list)) cands.push(...list);
+      if (pickBest().bs >= 0.75) break;                    // já achou uma rua bem parecida
     }
   }
-  const digits = String(userCep || '').replace(/\D/g, '');
   if (digits.length === 8) {
     const c = await getJSON(`https://viacep.com.br/ws/${digits}/json/`, 'cep', 150);
     if (c && !c.erro) cands.push({ ...c, _fromCep: true });
   }
-  const nb = norm(f.bairro);
-  let best = null, bs = 0;
-  for (const c of cands) {
-    let sc = similarity(base, stripType(c.logradouro));
-    if (nb && c.bairro && (norm(c.bairro).includes(nb) || nb.includes(norm(c.bairro)))) sc += 0.15;
-    if (digits && c.cep && c.cep.replace(/\D/g, '') === digits) sc += 0.1;
-    if (sc > bs) { bs = sc; best = c; }
-  }
+  const { best, bs } = pickBest();
   return best && bs >= 0.6 ? { name: best.logradouro, bairro: best.bairro, cep: String(best.cep || '').replace(/\D/g, '') } : null;
 }
 

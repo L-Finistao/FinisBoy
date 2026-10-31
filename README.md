@@ -36,7 +36,10 @@ PWA · Sem login · Sem servidor próprio · Funciona offline
 | **Evita trechos lentos** | Aprende pelo GPS onde você anda devagar (buraco, lombada, semáforo, trânsito) e você marca problemas com **⚠**. As próximas rotas fogem desses trechos. |
 | **Corrige endereço errado** | Acha o nome oficial da rua e o CEP certo mesmo com erro de digitação ou CEP errado. |
 | **Controla o dinheiro** | Ganho por entrega, fixo ou misto, gastos do dia e custo por km da moto. |
+| **Vários períodos de trabalho** | Cadastre cada período (ex.: Manhã e Noite) com o local e o modelo de pagamento próprio. Os dados são separados por período. |
+| **Visão diária de ganho e gasto** | Dia a dia: ganho, gastos e líquido, com barras e a divisão por período. |
 | **Guarda o histórico** | Rotas finalizadas com ganho, km e custo, filtradas por período. |
+| **Mostra o trajeto no mapa** | Trajeto feito colorido pela velocidade, horário de cada entrega e comparação **parte a parte** para ver qual trecho foi mais lento. |
 | **Funciona sem internet** | Baixe a cidade uma vez e use ruas, endereços e mapa offline. |
 
 Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem conta.
@@ -62,6 +65,32 @@ Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem 
 - **⚠ Problema aqui** marca rua esburacada, lombada, semáforo ou trânsito no ponto onde você está. O app também aprende sozinho onde você anda devagar ou para. Esses trechos aparecem em vermelho no mapa e **custam mais** nas próximas rotas.
 - Aplicar os trechos lentos nas rotas exige o **pacote offline** da cidade (o servidor público online não aceita custos próprios). Dá para desligar ou apagar o aprendizado em ⚙.
 
+### Períodos de trabalho (manhã, noite…)
+
+Em **⚙ → Períodos de trabalho**, cadastre cada período em que você trabalha. Exemplo:
+
+| Período | Local | Como é pago |
+|---|---|---|
+| Manhã | Padaria | Fixo R$ 100 por dia |
+| Noite | Pizzaria | Fixo R$ 35 + R$ 5 por entrega |
+
+- Cada **rota** pertence a um período. Ao criar a rota, o app escolhe pelo **horário** (se você preencheu "das… até…", inclusive virando a noite) ou usa o último período usado. Dá para trocar no cartão da rota ou depois, no histórico.
+- O **fixo** vale uma vez por dia e por período trabalhado (houve entrega ou rota finalizada). Se houver mais de uma rota no mesmo período e dia, o fixo é dividido entre elas, proporcional às entregas.
+- Os **gastos** podem ser ligados a um período (ou ficar como "Geral") ao serem apontados.
+- Em **📜 Histórico**, o filtro **Período trabalhado** mostra só os dados de um período e, em "Todos", compara os períodos (por dia e por entrega).
+- Em **📅 Dia**, veja o dia dividido por período e, mais abaixo, o **ganho e o gasto de cada dia** (7, 14 ou 30 dias) com barras; toque num dia para abri-lo.
+
+### Histórico no mapa
+
+Em **📜 Histórico** (ou 🗺 em **📅 Dia**), toque em **🗺 Ver trajeto e tempos no mapa** numa rota finalizada:
+
+- O **trajeto feito** aparece colorido pela velocidade: vermelho (parado/lento, menos de 5 km/h), laranja (5–15), amarelo (15–30) e verde (mais de 30 km/h).
+- Cada entrega vira um pino numerado com o **horário** e o tempo desde a entrega anterior.
+- A lista **parte a parte** compara os trechos *saída → 1*, *1 → 2*, *2 → 3*… com distância, tempo, velocidade média, tempo rodando e tempo parado. O trecho mais lento ganha 🐢 e o mais rápido 🐇; a barra mostra os minutos por km. Toque numa parte para destacá-la no mapa.
+- **🗺 Ver todas as entregas do período no mapa** mostra todos os pontos entregues e os trajetos de uma vez.
+
+O trajeto é gravado pelo GPS durante a rota (a cada ~12 m ou 15 s) e fica só no celular. Rotas feitas antes dessa versão mostram apenas os pinos e os tempos.
+
 ### Telas
 
 | Aba | Para que serve |
@@ -74,7 +103,7 @@ Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem 
 ### Configurações
 
 - **Meta de tempo por entrega**: o cronômetro fica verde, amarelo (80% da meta) e vermelho (estourou). Use `0` para desligar.
-- **Como eu ganho**: *por entrega*, *fixo por dia* ou *fixo + por entrega*.
+- **Períodos de trabalho**: cadastre quantos precisar. Cada um tem nome, local, horário (opcional) e como é pago: *por entrega*, *fixo por dia* ou *fixo + por entrega*.
 - **Custo por km da moto**: calculado a partir de gasolina (R$/L), consumo (km/L), troca de óleo (R$ e a cada quantos km) e outros custos por km, como pneus e corrente.
 - **Cidade/UF padrão**: ajuda a achar endereços colados sem cidade.
 - **Trechos lentos**: liga ou desliga o uso do que foi aprendido e das suas marcações, e apaga tudo se quiser recomeçar.
@@ -86,7 +115,7 @@ Cada endereço passa por estas fontes, na ordem, até ser achado:
 | # | Fonte | O que faz |
 |---|---|---|
 | 1 | Cache do aparelho | Endereço já localizado antes (e repetido na mesma lista) não é buscado de novo. |
-| 2 | [ViaCEP](https://viacep.com.br/) | Corrige o nome da rua digitado errado (Luís/Luiz, Moreti/Moretti) e acha o CEP certo. Também confere o CEP informado. |
+| 2 | [ViaCEP](https://viacep.com.br/) | Corrige o nome da rua digitado errado (Luís/Luiz, Moreti/Moretti, Teixrita/Teixeira) e acha o CEP certo. Se a frase inteira não achar, tenta cada palavra do nome. Também confere o CEP informado. |
 | 3 | [Nominatim](https://nominatim.org/) | Ponto exato da casa, quando o OpenStreetMap tem o número. |
 | 4 | [Photon](https://photon.komoot.io/) | Busca aproximada para nomes parecidos. |
 | 5 | CEP ([BrasilAPI](https://brasilapi.com.br/)) | Ponto aproximado da região, só se o CEP combinar com a rua. |
@@ -208,6 +237,8 @@ Projeto_Motoboy/
 ├── parse.js        Leitura do texto do WhatsApp e localização dos endereços
 ├── offline.js      Pacote offline: download, busca de endereço e rota
 ├── live.js         Tempo real: recálculo automático e trechos lentos
+├── earnings.js     Períodos de trabalho, ganhos, gastos e telas Dia/Histórico
+├── history.js      Trajeto gravado e histórico no mapa (parte a parte)
 ├── vercel.json     Configuração de publicação na Vercel
 ├── sw.js           Service Worker (cache e uso offline)
 ├── manifest.json   Configuração do PWA

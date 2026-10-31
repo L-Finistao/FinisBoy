@@ -44,6 +44,22 @@
         </div>
       </section>
 
+      <!-- Histórico no mapa: trajeto feito, tempos e comparação parte a parte -->
+      <section id="histview" hidden>
+        <div class="hv-top"><button id="hvBack">← Voltar</button><b id="hvTitle"></b></div>
+        <div id="hvSummary" class="gsum"></div>
+        <div class="legend">
+          Velocidade no trajeto:
+          <span><i class="lg c1"></i>parado/lento (&lt;5 km/h)</span>
+          <span><i class="lg c2"></i>5–15</span>
+          <span><i class="lg c3"></i>15–30</span>
+          <span><i class="lg c4"></i>&gt;30 km/h</span>
+        </div>
+        <p id="hvNote" class="muted"></p>
+        <h2 class="sec" id="hvSegTitle">Parte a parte</h2>
+        <ol id="segList"></ol>
+      </section>
+
       <section id="next" hidden></section>
 
       <h2 class="sec">Rotas atuais</h2>
@@ -72,6 +88,9 @@
     </div>
     <div id="dSum" class="gsum"></div>
 
+    <h3>Por período trabalhado</h3>
+    <div id="dProf"></div>
+
     <h3>Rotas do dia</h3>
     <ul id="dRoutes" class="rows"></ul>
 
@@ -83,9 +102,21 @@
         <option>Combustível</option><option>Manutenção</option><option>Alimentação</option>
         <option>Aluguel da moto</option><option>Outros</option>
       </select>
+      <select id="exProf" title="Período trabalhado"></select>
       <input id="exDesc" type="text" placeholder="Descrição (opcional)">
       <button id="exAdd" class="primary">＋ Apontar gasto</button>
     </div>
+
+    <h3>Ganho e gasto por dia</h3>
+    <label>Intervalo
+      <select id="dRange">
+        <option value="7">Últimos 7 dias</option>
+        <option value="14" selected>Últimos 14 dias</option>
+        <option value="30">Últimos 30 dias</option>
+      </select>
+    </label>
+    <div id="dTotals" class="gsum"></div>
+    <ul id="dDaily" class="daily"></ul>
   </section>
 
   <!-- Histórico de rotas finalizadas -->
@@ -98,7 +129,12 @@
         <option value="tudo">Tudo</option>
       </select>
     </label>
+    <label>Período trabalhado
+      <select id="hProf"></select>
+    </label>
     <div id="hSum" class="gsum"></div>
+    <div id="hProfSum"></div>
+    <button id="hAll" class="primary wide" data-act="hmapall" hidden>🗺 Ver todas as entregas do período no mapa</button>
     <h3>Rotas finalizadas</h3>
     <div id="hList"></div>
   </section>
@@ -113,6 +149,9 @@
     <form method="dialog" id="addForm">
       <h2>Nova rota</h2>
       <p class="muted">Cole a mensagem do WhatsApp com os endereços. Tudo o que você colar agora vira uma rota (poucas ou muitas paradas).</p>
+      <label>Período de trabalho
+        <select id="routeProfile"></select>
+      </label>
       <textarea id="txt" rows="9" placeholder="[29/10, 21:23] +55 18 99764-0397: Rua das Flores, 123 - Centro&#10;..."></textarea>
       <label>Cidade / UF padrão
         <input id="city" type="text" placeholder="Ex.: Birigui - SP" autocomplete="off">
@@ -135,20 +174,11 @@
         <input id="cityS" type="text" placeholder="Ex.: Birigui - SP" autocomplete="off">
       </label>
 
-      <h3>Como eu ganho</h3>
-      <label>Modelo
-        <select id="payMode">
-          <option value="entrega">Por entrega</option>
-          <option value="fixo">Fixo (por dia trabalhado)</option>
-          <option value="misto">Variável: fixo + por entrega</option>
-        </select>
-      </label>
-      <label id="payFixedWrap">Valor fixo por dia (R$)
-        <input id="payFixed" type="text" inputmode="decimal" placeholder="0,00">
-      </label>
-      <label id="payPerWrap">Valor por entrega (R$)
-        <input id="payPer" type="text" inputmode="decimal" placeholder="0,00">
-      </label>
+      <h3>Períodos de trabalho</h3>
+      <p class="muted">Cadastre cada período em que você trabalha, com o local e como é pago. Exemplo: <b>Manhã</b>, fixo R$ 100; <b>Noite</b>, fixo R$ 35 + R$ 5 por entrega. Com o horário preenchido, o app escolhe o período sozinho ao criar uma rota (e você pode trocar).</p>
+      <div id="profList"></div>
+      <button type="button" id="profAdd" class="wide">＋ Adicionar período</button>
+
       <h3>Custo da moto por km</h3>
       <div class="two">
         <label>Gasolina (R$ por litro)
@@ -203,6 +233,8 @@
   <script src="vendor/leaflet.js"></script>
   <script src="offline.js"></script>
   <script src="live.js"></script>
+  <script src="earnings.js"></script>
+  <script src="history.js"></script>
   <script src="parse.js"></script>
   <script src="app.js"></script>
 </body>

@@ -176,3 +176,54 @@ label { display: block; font-size: 14px; color: var(--muted); }
 .hzgrid button { padding: 16px 8px; font-size: 15px; }
 label.check { display: flex; gap: 8px; align-items: flex-start; color: var(--text); }
 label.check input { width: auto; margin: 3px 0 0; }
+
+/* Histórico no mapa: trajeto, tempos e parte a parte */
+#histview { display: none; }
+body.histview #histview:not([hidden]) { display: block; }
+body.histview #runbar, body.histview #next, body.histview h2.sec:not(#hvSegTitle), body.histview #rlist,
+body.histview #empty, body.histview .toolbar, body.histview #stopsTitle, body.histview #list { display: none; }
+.hv-top { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.hv-top b { flex: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+.lg { display: inline-block; width: 14px; height: 6px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+.lg.c1 { background: #dc2626; } .lg.c2 { background: #f97316; } .lg.c3 { background: #eab308; } .lg.c4 { background: #16a34a; }
+#segList { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.seg { background: var(--card); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; cursor: pointer; }
+.seg.focus { border-color: var(--brand); }
+.seg.is-slow { border-left: 5px solid #dc2626; }
+.sg-top { display: flex; align-items: center; gap: 8px; }
+.sg-top b { flex: 0 0 auto; }
+.sg-t { margin-left: auto; font: 700 16px ui-monospace, Menlo, Consolas, monospace; }
+.sg-addr { font-size: 13px; overflow-wrap: anywhere; }
+.sg-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.sg-bar { height: 6px; background: var(--bg); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.sg-bar i { display: block; height: 100%; border-radius: 3px; }
+.tag { font-size: 11px; padding: 1px 7px; border-radius: 99px; }
+.tag.slow { background: #fee2e2; color: #991b1b; } .tag.fast { background: #dcfce7; color: #166534; }
+.hv-tip { background: rgba(17,24,39,.85); color: #fff; border: 0; font-size: 11px; padding: 1px 5px; box-shadow: none; }
+.hv-tip::before { display: none; }
+button.wide { width: 100%; margin: 8px 0; }
+
+/* Períodos de trabalho e visão diária */
+.prof { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin: 8px 0; }
+.prof .two { grid-template-columns: 1fr 1fr; }
+.prof input, .prof select { margin-bottom: 8px; }
+.pcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
+.ph { display: flex; flex-direction: column; margin-bottom: 6px; }
+.pg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pg span { font-size: 12px; color: var(--muted); }
+.pg b { display: block; font-size: 15px; color: var(--text); }
+.pg b.pos { color: var(--ok); } .pg b.neg { color: var(--bad); }
+.daily { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.daily li { background: var(--card); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; cursor: pointer; }
+.daily li.sel { border-color: var(--brand); }
+.dtop { display: flex; justify-content: space-between; }
+.dbar { height: 7px; background: var(--bg); border-radius: 4px; margin-top: 4px; overflow: hidden; }
+.dbar i { display: block; height: 100%; border-radius: 4px; }
+.dbar .g { background: var(--ok); } .dbar .s { background: var(--bad); }
+.dmeta { font-size: 12px; margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip { font-size: 11px; background: var(--bg); border-radius: 99px; padding: 1px 8px; }
+label.rprof { margin-top: 6px; font-size: 12px; }
+label.rprof select { padding: 6px; margin: 2px 0 0; }
+.hbody label select { padding: 6px; margin: 2px 0 8px; }
