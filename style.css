@@ -240,3 +240,7 @@ label.rprof select { padding: 6px; margin: 2px 0 0; }
 .av-colors { display: flex; gap: 10px; margin: 6px 0 12px; }
 .av-color { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid var(--card); box-shadow: 0 0 0 1px var(--line); }
 .av-color.on { box-shadow: 0 0 0 3px var(--brand); }
+
+.pre { white-space: pre-line; overflow-wrap: anywhere; }
+#authErr:empty { display: none; }
+#authErr { font-size: 14px; margin: 0 0 8px; }

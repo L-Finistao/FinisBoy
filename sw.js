@@ -1,9 +1,9 @@
-const CACHE = 'finisboy-v24';
+const CACHE = 'finisboy-v25';
 const TILES = 'finisboy-tiles';       // blocos do mapa: sobrevivem às atualizações do app
 const MAX_TILES = 8000;
 
 const SHELL = [
-  './', './index.html', './style.css', './app.js', './parse.js', './offline.js', './live.js', './avatar.js', './earnings.js', './history.js', './manifest.json',
+  './', './index.html', './style.css', './app.js', './parse.js', './offline.js', './live.js', './auth.js', './avatar.js', './earnings.js', './history.js', './manifest.json',
   './icon-192.png', './icon-512.png', './logo.png',
   './vendor/leaflet.js', './vendor/leaflet.css',
   './vendor/images/layers.png', './vendor/images/layers-2x.png',
@@ -58,6 +58,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.pathname.startsWith('/api/')) return;                       // contas e sincronização: sempre direto na rede, nunca em cache
   if (url.hostname === 'tile.openstreetmap.org') e.respondWith(tile(req));
   else if (url.origin === location.origin) e.respondWith(shell(req));
   // Nominatim e OSRM passam direto: o app trata a falta de internet.

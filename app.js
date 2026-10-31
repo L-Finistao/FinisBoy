@@ -8,6 +8,7 @@ const newId = () => Date.now() + '-' + Math.random().toString(36).slice(2, 7);
 /* ---------- Banco local (IndexedDB) ---------- */
 const DB = (() => {
   let db;
+  const mark = (s, id, del) => { if (typeof syncMark === 'function') syncMark(s, id, del); };   // auth.js: fila de envio para a conta
   const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   const store = (name, mode = 'readonly') => db.transaction(name, mode).objectStore(name);
   return {
@@ -22,14 +23,14 @@ const DB = (() => {
       r.onerror = () => rej(r.error);
     }),
     all: () => req(store('stops').getAll()),
-    put: s => req(store('stops', 'readwrite').put(s)),
-    del: id => req(store('stops', 'readwrite').delete(id)),
+    put: s => req(store('stops', 'readwrite').put(s)).then(r => (mark('stops', s.id), r)),
+    del: id => req(store('stops', 'readwrite').delete(id)).then(r => (mark('stops', id, true), r)),
     allOf: n => req(store(n).getAll()),
     getOf: (n, id) => req(store(n).get(id)),
-    putOf: (n, o) => req(store(n, 'readwrite').put(o)),
-    delOf: (n, id) => req(store(n, 'readwrite').delete(id)),
+    putOf: (n, o) => req(store(n, 'readwrite').put(o)).then(r => (mark(n, o.id), r)),
+    delOf: (n, id) => req(store(n, 'readwrite').delete(id)).then(r => (mark(n, id, true), r)),
     get: k => req(store('kv').get(k)),
-    set: (k, v) => req(store('kv', 'readwrite').put(v, k)),
+    set: (k, v) => req(store('kv', 'readwrite').put(v, k)).then(r => (mark('kv', k), r)),
   };
 })();
 
@@ -994,6 +995,7 @@ document.addEventListener('pointerdown', syncAwake);
 
 (async function init() {
   await DB.open();
+  await authGate();                       // login obrigatório + dados da conta (auth.js)
   stops = await DB.all();
   routes = await DB.allOf('routes');
   deliveries = await DB.allOf('deliveries');

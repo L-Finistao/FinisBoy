@@ -165,9 +165,31 @@
     </form>
   </dialog>
 
+  <dialog id="authDlg">
+    <form id="authForm" method="dialog" autocomplete="on">
+      <h2 id="authTitle">Entrar</h2>
+      <p class="muted">Seus dados ficam separados por conta e sincronizados entre aparelhos.</p>
+      <label id="authNameWrap" hidden>Nome <input id="authName" type="text" autocomplete="name" placeholder="Como quer ser chamado"></label>
+      <label>E-mail <input id="authEmail" type="email" autocomplete="email" required></label>
+      <label>Senha (mínimo 8 caracteres) <input id="authPass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <label id="authCodeWrap" hidden>Código de convite <input id="authCode" type="text" autocomplete="off"></label>
+      <p class="neg" id="authErr" role="alert"></p>
+      <div class="row">
+        <button type="button" id="authSwitch">Criar conta nova</button>
+        <button class="primary" id="authSubmit">Entrar</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="setDlg">
     <form method="dialog" id="setForm">
       <h2>Configurações</h2>
+      <h3>Conta</h3>
+      <p class="muted pre" id="acctInfo"></p>
+      <div class="btns">
+        <button type="button" id="btnSync">🔄 Sincronizar agora</button>
+        <button type="button" id="btnLogout" class="danger">Sair da conta</button>
+      </div>
       <label>Tempo médio de entrega desejado (minutos)
         <input id="target" type="number" min="0" max="240" inputmode="numeric">
       </label>
@@ -241,6 +263,7 @@
 
   <script src="vendor/leaflet.js"></script>
   <script src="offline.js"></script>
+  <script src="auth.js"></script>
   <script src="avatar.js"></script>
   <script src="live.js"></script>
   <script src="earnings.js"></script>
