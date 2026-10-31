@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#42474C">
+  <title>FinisBoy</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1><img src="logo.png" alt="FinisBoy"></h1>
+    <div class="head-actions">
+      <button id="btnSet" title="Configurações">⚙</button>
+      <button id="btnAdd" class="primary">＋ Nova rota</button>
+    </div>
+  </header>
+  <div id="netbar" hidden></div>
+
+  <!-- Principal: rotas atuais + mapa -->
+  <section id="viewRoutes" class="view">
+    <div id="mapwrap">
+      <div id="map"></div>
+      <button id="btnCenter" title="Centralizar em mim">🎯</button>
+    </div>
+    <div id="status" hidden></div>
+
+    <main id="panel">
+      <section id="runbar" hidden>
+        <div class="rb-name" id="rbName"></div>
+        <div class="rb-main">
+          <div><div class="lbl">Entrega atual</div><div id="rbLeg" class="clock">00:00</div><div id="rbTarget" class="muted"></div></div>
+          <div class="rb-side"><div id="rbTotal"></div><div id="rbAvg" class="muted"></div><div id="rbMoney" class="muted"></div></div>
+        </div>
+        <div class="btns">
+          <button id="btnList">☰ Lista</button>
+          <button id="btnEnd" class="danger">⏹ Finalizar rota</button>
+        </div>
+      </section>
+
+      <section id="next" hidden></section>
+
+      <h2 class="sec">Rotas atuais</h2>
+      <ul id="rlist" class="rlist"></ul>
+      <p id="empty" class="muted">Nenhuma rota ainda. Toque em “Nova rota”, cole o texto do WhatsApp e a rota é montada sozinha. Cada colagem vira uma rota que você inicia quando quiser.</p>
+
+      <div class="toolbar">
+        <button id="btnRoute">🧭 Recalcular rota</button>
+        <button id="btnLocate">📍 Minha posição</button>
+        <button id="btnMapOff">📦 Baixar cidade (offline)</button>
+        <button id="btnClear" class="danger">🗑 Limpar pendentes</button>
+      </div>
+
+      <h2 class="sec" id="stopsTitle" hidden></h2>
+      <ol id="list"></ol>
+    </main>
+  </section>
+
+  <!-- Visão diária -->
+  <section id="viewDay" class="view scroll" hidden>
+    <div class="daynav">
+      <button id="dPrev">◀</button>
+      <input id="dDate" type="date">
+      <button id="dNext">▶</button>
+      <button id="dToday">Hoje</button>
+    </div>
+    <div id="dSum" class="gsum"></div>
+
+    <h3>Rotas do dia</h3>
+    <ul id="dRoutes" class="rows"></ul>
+
+    <h3>Gastos do dia</h3>
+    <ul id="dExp" class="rows"></ul>
+    <div class="exform">
+      <input id="exValor" type="text" inputmode="decimal" placeholder="Valor R$">
+      <select id="exCat">
+        <option>Combustível</option><option>Manutenção</option><option>Alimentação</option>
+        <option>Aluguel da moto</option><option>Outros</option>
+      </select>
+      <input id="exDesc" type="text" placeholder="Descrição (opcional)">
+      <button id="exAdd" class="primary">＋ Apontar gasto</button>
+    </div>
+  </section>
+
+  <!-- Histórico de rotas finalizadas -->
+  <section id="viewHist" class="view scroll" hidden>
+    <label>Período
+      <select id="hPeriod">
+        <option value="hoje">Hoje</option>
+        <option value="semana" selected>Esta semana</option>
+        <option value="mes">Este mês</option>
+        <option value="tudo">Tudo</option>
+      </select>
+    </label>
+    <div id="hSum" class="gsum"></div>
+    <h3>Rotas finalizadas</h3>
+    <div id="hList"></div>
+  </section>
+
+  <nav class="tabs">
+    <button data-tab="routes" class="on">🏍️ Rotas</button>
+    <button data-tab="day">📅 Dia</button>
+    <button data-tab="hist">📜 Histórico</button>
+  </nav>
+
+  <dialog id="addDlg">
+    <form method="dialog" id="addForm">
+      <h2>Nova rota</h2>
+      <p class="muted">Cole a mensagem do WhatsApp com os endereços. Tudo o que você colar agora vira uma rota (poucas ou muitas paradas).</p>
+      <textarea id="txt" rows="9" placeholder="[29/10, 21:23] +55 18 99764-0397: Rua das Flores, 123 - Centro&#10;..."></textarea>
+      <label>Cidade / UF padrão
+        <input id="city" type="text" placeholder="Ex.: Birigui - SP" autocomplete="off">
+      </label>
+      <div class="row">
+        <button type="button" id="btnCancel">Cancelar</button>
+        <button type="submit" class="primary">Criar rota</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="setDlg">
+    <form method="dialog" id="setForm">
+      <h2>Configurações</h2>
+      <label>Tempo médio de entrega desejado (minutos)
+        <input id="target" type="number" min="0" max="240" inputmode="numeric">
+      </label>
+      <p class="muted">Durante a rota, o cronômetro da entrega fica verde, amarelo (80% da meta) e vermelho (estourou). Use 0 para desligar.</p>
+      <label>Cidade / UF padrão
+        <input id="cityS" type="text" placeholder="Ex.: Birigui - SP" autocomplete="off">
+      </label>
+
+      <h3>Como eu ganho</h3>
+      <label>Modelo
+        <select id="payMode">
+          <option value="entrega">Por entrega</option>
+          <option value="fixo">Fixo (por dia trabalhado)</option>
+          <option value="misto">Variável: fixo + por entrega</option>
+        </select>
+      </label>
+      <label id="payFixedWrap">Valor fixo por dia (R$)
+        <input id="payFixed" type="text" inputmode="decimal" placeholder="0,00">
+      </label>
+      <label id="payPerWrap">Valor por entrega (R$)
+        <input id="payPer" type="text" inputmode="decimal" placeholder="0,00">
+      </label>
+      <h3>Custo da moto por km</h3>
+      <div class="two">
+        <label>Gasolina (R$ por litro)
+          <input id="fuelPrice" type="text" inputmode="decimal" placeholder="6,00">
+        </label>
+        <label>Consumo (km por litro)
+          <input id="kmPerL" type="text" inputmode="decimal" placeholder="35">
+        </label>
+        <label>Óleo (R$ por troca)
+          <input id="oilPrice" type="text" inputmode="decimal" placeholder="40,00">
+        </label>
+        <label>Troca de óleo a cada (km)
+          <input id="oilKm" type="text" inputmode="decimal" placeholder="1000">
+        </label>
+      </div>
+      <label>Outros custos (R$ por km) — pneus, corrente, revisão (opcional)
+        <input id="otherKm" type="text" inputmode="decimal" placeholder="0,00">
+      </label>
+      <div id="costPreview" class="preview"></div>
+
+      <h3>Pacote offline</h3>
+      <p class="muted" id="packInfo"></p>
+      <button type="button" id="btnPackDel" class="danger">Apagar pacote offline</button>
+
+      <button type="button" id="btnInstall" hidden>📲 Instalar o app no celular</button>
+
+      <div class="row">
+        <button type="button" id="setCancel">Cancelar</button>
+        <button type="submit" class="primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="vendor/leaflet.js"></script>
+  <script src="offline.js"></script>
+  <script src="parse.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
