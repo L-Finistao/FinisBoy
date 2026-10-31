@@ -371,6 +371,25 @@ function cumulative(coords) {
   return c;
 }
 
+/* ---------- Linha da rota acompanha o trajeto ---------- */
+// O que já foi percorrido fica cinza e fino; só o que falta continua laranja, começando na sua posição.
+let doneLine = null, lastNear = null;
+
+function clearRouteLine() {
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  if (doneLine) { map.removeLayer(doneLine); doneLine = null; }
+}
+
+function trimRouteLine(coords) {
+  if (!routeLine || !session || !lastNear || lastNear.coords !== coords || lastNear.d > 70) return;
+  const { i, t } = lastNear, a = coords[i], b = coords[i + 1];
+  const at = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];       // sua posição projetada na linha
+  routeLine.setLatLngs([at, ...coords.slice(i + 1)]);
+  const past = [...coords.slice(0, i + 1), at];
+  if (!doneLine) doneLine = L.polyline(past, { color: '#98A2B3', weight: 4, opacity: .7, interactive: false }).addTo(map);
+  else doneLine.setLatLngs(past);
+}
+
 function liveProgress(p) {
   const r = session;
   if (!r || !me) return;
@@ -388,6 +407,8 @@ function liveProgress(p) {
   const geo = r.geo;
   if (!geo || !geo.coords || geo.coords.length < 2 || curId !== r.id) { $('rbEta').textContent = ''; return; }
   const near = nearestOnRoute(me, geo.coords);
+  lastNear = { ...near, coords: geo.coords };
+  trimRouteLine(geo.coords);
 
   // quanto falta (distância e tempo) pelo caminho planejado
   const cum = cumulative(geo.coords), total = cum[cum.length - 1];

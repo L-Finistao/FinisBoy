@@ -1,12 +1,10 @@
 :root {
+  color-scheme: light;
   /* paleta do logo: laranja, azul-marinho, cinza-grafite e branco (amarelo só como detalhe) */
   --bg: #F5F6F8; --card: #fff; --text: #14233C; --muted: #667085;
   --brand: #FF6B00; --brand-soft: rgba(255,107,0,.10); --accent: #FFB400;
   --navy: #14233C; --logo-bg: #42474C; --ok: #16a34a; --bad: #dc2626; --line: #E6E8EC;
   --r: 14px; --shadow: 0 1px 2px rgba(20,35,60,.06), 0 2px 8px rgba(20,35,60,.05);
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0E1624; --card: #172236; --text: #EEF1F6; --muted: #9AA6B8; --line: #26344B; --brand-soft: rgba(255,107,0,.16); --shadow: 0 1px 2px rgba(0,0,0,.4); }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }

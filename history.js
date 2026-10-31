@@ -203,7 +203,7 @@ function drawTrack(pts, weight, cv, bounds) {
 
 function drawHistory(fit) {
   markersLayer.clearLayers();
-  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  clearRouteLine();
   if (!histLayer) histLayer = L.layerGroup().addTo(map);
   histLayer.clearLayers();
   hist.dirty = false;

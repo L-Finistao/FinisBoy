@@ -712,7 +712,7 @@ function renderMap(fit) {
     return;
   }
   markersLayer.clearLayers();
-  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  clearRouteLine();
   const r = cur();
   const bounds = [];
   if (r) {
@@ -726,6 +726,7 @@ function renderMap(fit) {
     });
     if (r.geo) {
       routeLine = L.polyline(r.geo.coords, { color: '#FF6B00', weight: 5, opacity: .85 }).addTo(map);
+      trimRouteLine(r.geo.coords);
       bounds.push(...r.geo.coords);
     }
   }
