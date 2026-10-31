@@ -339,6 +339,7 @@ function checkAhead(geo, near) {
   if (a.sig === slowSig || busy || Date.now() - lastSlowReroute < 60000) return;   // já tentou desviar desta; não fica recalculando à toa
   slowSig = a.sig; lastSlowReroute = Date.now();
   setStatus('🐢 Via lenta à frente (+' + fmtDur(a.extra) + ' pela média registrada): procurando alternativa…');
+  say('Via lenta à frente. Procurando alternativa.', 'slow');
   buildRoute(false);
 }
 
@@ -401,6 +402,7 @@ function liveProgress(p) {
   if (nxt && curId === r.id && haversine(me, nxt) < 35 && !arrived.has(nxt.id)) {
     arrived.add(nxt.id);
     setStatus('📍 Você chegou: toque em ✓ Entregue quando entregar.', 6000);
+    say('Você chegou: ' + shortAddr(nxt) + '.', 'arr' + nxt.id);
     if (navigator.vibrate) navigator.vibrate(200);
   }
 
@@ -409,6 +411,7 @@ function liveProgress(p) {
   const near = nearestOnRoute(me, geo.coords);
   lastNear = { ...near, coords: geo.coords };
   trimRouteLine(geo.coords);
+  voiceNav(geo, near, p.coords.speed);
 
   // quanto falta (distância e tempo) pelo caminho planejado
   const cum = cumulative(geo.coords), total = cum[cum.length - 1];

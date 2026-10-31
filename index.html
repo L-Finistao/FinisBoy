@@ -38,6 +38,7 @@
         </div>
         <div id="rbEta" class="eta"></div>
         <div class="btns">
+          <button id="rbVoice" type="button">🔊 Falar rota</button>
           <button id="btnHaz">⚠ Problema aqui</button>
           <button id="btnList">☰ Lista</button>
           <button id="btnEnd" class="danger">⏹ Finalizar rota</button>
@@ -227,6 +228,13 @@
       <div id="avKinds" class="av-grid"></div>
       <div id="avColors" class="av-colors"></div>
 
+      <h3>Assistente de voz</h3>
+      <label class="check"><input type="checkbox" id="voiceSpeak"> Falar avisos (próxima parada, chegada, via lenta, fim da rota)</label>
+      <label class="check"><input type="checkbox" id="voiceNav"> Falar o caminho curva a curva ("Em 200 metros, vire à direita na Rua…")</label>
+      <label class="check"><input type="checkbox" id="voiceListen"> Escutar comandos durante a rota (diga "Finis, ajuda")</label>
+      <p class="muted">Comandos: entrega feita · próxima parada · quanto falta · quantas faltam · quanto ganhei hoje · falar a rota · finalizar rota · repetir · silêncio. A escuta precisa de internet e do microfone liberado.</p>
+      <p class="muted" id="voiceInfo"></p>
+
       <h3>Trechos lentos</h3>
       <label class="check"><input type="checkbox" id="keepOn"> Manter a tela acesa durante a rota</label>
       <label class="check"><input type="checkbox" id="learnOn"> Evitar trechos lentos (aprendidos pelo GPS e marcados por mim)</label>
@@ -266,6 +274,8 @@
   <script src="auth.js"></script>
   <script src="avatar.js"></script>
   <script src="live.js"></script>
+  <script src="voice.js"></script>
+  <script src="voicenav.js"></script>
   <script src="earnings.js"></script>
   <script src="history.js"></script>
   <script src="parse.js"></script>

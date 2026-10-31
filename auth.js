@@ -7,7 +7,7 @@
 
 const SYNC_STORES = new Set(['stops', 'deliveries', 'expenses', 'routes', 'tracks']);
 // Configurações (kv) que vão para a conta. O pacote offline e o cache de endereços ficam só no aparelho.
-const SYNC_KV = new Set(['profiles', 'lastProfile', 'pay', 'target', 'city', 'learnOn', 'keepOn', 'avatar', 'hazards', 'devzones', 'speedmap']);
+const SYNC_KV = new Set(['profiles', 'lastProfile', 'pay', 'target', 'city', 'learnOn', 'keepOn', 'voice', 'avatar', 'hazards', 'devzones', 'speedmap']);
 const KV_MIN_MS = { speedmap: 5 * 60 * 1000 };               // o mapa de velocidades muda a cada instante e é pesado
 const BATCH_BYTES = 800 * 1024;
 const MAX_DOC_BYTES = 3.5 * 1024 * 1024;

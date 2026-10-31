@@ -106,6 +106,7 @@ const haversine = (a, b) => {
 async function geocodeAll() {
   // sem posição, ou achados só offline (refinados quando há internet); os que o usuário marcou no mapa não mudam
   const todo = stops.filter(s => s.routeId === curId && !s.done && s.src !== 'manual' && (s.lat == null || (s.src === 'offline' && navigator.onLine)));
+  if (todo.length) await ensureAutoCity();
   for (let i = 0; i < todo.length; i++) {
     const s = todo[i];
     setStatus(`Localizando endereços ${i + 1}/${todo.length}…`);
@@ -121,7 +122,7 @@ async function geocodeAll() {
     render();
   }
   const falhas = stops.filter(s => s.routeId === curId && !s.done && s.failed).length;
-  if (falhas) geoFailMsg = `${falhas} endereço(s) não localizado(s): toque em ✎ para corrigir ou 📍 para marcar no mapa.`;
+  if (falhas) geoFailMsg = `${falhas} endereço(s) não localizado(s): toque em ✎ para corrigir ou 📍 para marcar no mapa.` + (city || (geoCache._auto && geoCache._auto.text) ? '' : ' Dica: defina a cidade em Configurações.');
 }
 
 // Marca a posição de uma parada tocando no mapa (para endereços que a busca não achou ou achou só na rua).
@@ -217,12 +218,12 @@ async function osrmBest(pts, start) {
   const rt = typeof routePenalty === 'function' && hasLearning() && ordered.length <= 26
     ? await osrmLegsLearned(base, ordered)                       // escolhe, trecho a trecho, a alternativa melhor pelo seu histórico
     : null;
-  if (rt) return { position, legs: rt.legs, distance: rt.distance, duration: rt.duration, coords: rt.coords, baseline: baselineCost(T, D), learned: rt.learned };
-  const rj = await fetchJson(`${base}/route/v1/driving/${cs(ordered)}?overview=full&geometries=geojson&steps=false`);
+  if (rt) return { position, legs: rt.legs, steps: osrmSteps(rt.legs), distance: rt.distance, duration: rt.duration, coords: rt.coords, baseline: baselineCost(T, D), learned: rt.learned };
+  const rj = await fetchJson(`${base}/route/v1/driving/${cs(ordered)}?overview=full&geometries=geojson&steps=true`);
   if (rj.code !== 'Ok') throw new Error(rj.message || rj.code);
   const r0 = rj.routes[0];
   return {
-    position, legs: r0.legs, distance: r0.distance, duration: r0.duration,
+    position, legs: r0.legs, steps: osrmSteps(r0.legs), distance: r0.distance, duration: r0.duration,
     coords: r0.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
     baseline: baselineCost(T, D),
   };
@@ -234,7 +235,7 @@ async function osrmLegsLearned(base, ordered) {
   const jobs = [];
   for (let i = 0; i + 1 < ordered.length; i++) {
     const a = ordered[i], b = ordered[i + 1];
-    jobs.push(() => fetchJson(`${base}/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?alternatives=3&overview=full&geometries=geojson&steps=false`));
+    jobs.push(() => fetchJson(`${base}/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?alternatives=3&overview=full&geometries=geojson&steps=true`));
   }
   const res = [];
   for (let i = 0; i < jobs.length; i += 4) res.push(...await Promise.all(jobs.slice(i, i + 4).map(f => f())));   // 4 por vez
@@ -259,13 +260,13 @@ async function osrmLegsLearned(base, ordered) {
 async function osrmTrip(pts, start) {
   const coords = pts.map(p => `${p.lon},${p.lat}`).join(';');
   const url = `https://router.project-osrm.org/trip/v1/driving/${coords}` +
-    `?roundtrip=false&source=${start ? 'first' : 'any'}&destination=any&geometries=geojson&overview=full`;
+    `?roundtrip=false&source=${start ? 'first' : 'any'}&destination=any&geometries=geojson&overview=full&steps=true`;
   const j = await fetchJson(url);
   if (j.code !== 'Ok') throw new Error(j.message || j.code);
   const trip = j.trips[0];
   return {
     position: j.waypoints.map(w => w.waypoint_index),
-    legs: trip.legs,
+    legs: trip.legs, steps: osrmSteps(trip.legs),
     coords: trip.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
     distance: trip.distance,
     duration: trip.duration,
@@ -348,7 +349,8 @@ async function optimize() {
     s.legDist = leg ? leg.distance : null;
     s.legDur = leg ? leg.duration : null;
   });
-  r.geo = { coords: res.coords, distance: res.distance, duration: res.duration, approx: !!res.approx, baseline: res.baseline || null };
+  r.geo = { coords: res.coords, distance: res.distance, duration: res.duration, approx: !!res.approx, baseline: res.baseline || null,
+    steps: res.steps && res.steps.length ? placeSteps(res.steps, res.coords) : null };
   const saved = res.baseline ? res.baseline.duration - res.duration : 0;
   lastInfo = `✓ Melhor rota: ${list.length} parada(s) · ${fmtDist(res.distance)} · ${fmtDur(res.duration)}` +
     (saved > 60 ? ` · ${fmtDur(saved)} a menos que na ordem colada` : '') +
@@ -438,6 +440,7 @@ async function startRoute(id) {
   applySessionUI();
   await buildRoute();        // recalcula a partir de onde você está e enquadra o mapa
   if (r.geo) { r.kmPlan = r.geo.distance; await putRoute(r); }
+  say('Rota iniciada. ' + nextStopText());
 }
 
 async function endRoute(auto = false) {      // auto: última entrega feita, finaliza sem perguntar
@@ -466,6 +469,7 @@ async function endRoute(auto = false) {      // auto: última entrega feita, fin
   applySessionUI();
   render(true);
   setStatus('✓ Rota finalizada e enviada ao histórico.', 4000);
+  say(`Rota finalizada. ${feitas} ${feitas === 1 ? 'entrega feita' : 'entregas feitas'}.`);
 }
 
 async function deleteRoute(id) {
@@ -524,6 +528,7 @@ async function markDone(id, done) {
   await DB.put(s);
   if (done && session && !pending().length && curId === session.id) { await endRoute(true); return; }   // acabaram as paradas
   await buildRoute();
+  if (done && session && curId === session.id) say(nextStopText());
 }
 
 async function removeStop(id) {
@@ -579,6 +584,7 @@ async function removeExpense(id) {
 function applySessionUI() {
   document.body.classList.toggle('running', !!session);
   syncAwake();
+  voiceSync();
   if (!session) document.body.classList.remove('showlist');
   if (session) showTab('routes');
   map.invalidateSize();
@@ -1010,6 +1016,7 @@ document.addEventListener('pointerdown', syncAwake);
   loadPack(await DB.get('pack'));
   await liveInit();
   await avatarInit();
+  await voiceInit();
   { const k = await DB.get('keepOn'); keepOn = k == null ? true : !!k; }
   me = (await DB.get('lastMe')) || null;      // última posição conhecida: abre já na sua cidade
   daySel = dayKey(Date.now());

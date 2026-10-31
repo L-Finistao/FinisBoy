@@ -114,9 +114,22 @@ function cityParts(str) {                       // "Birigui - SP" -> { name: 'Bi
   return m ? { name: m[1].trim(), uf: m[2].toUpperCase() } : { name: t, uf: '' };
 }
 
+// Sem cidade nas configurações nem no endereço, usa a cidade onde você está (pelo GPS): "Rua X, 100" existe em centenas de cidades.
+async function ensureAutoCity() {
+  if (city || !me || !navigator.onLine) return;
+  const ac = geoCache._auto;
+  if (ac && haversine(ac, me) < 15000) return;
+  try {
+    const j = await getJSON(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=pt-BR&lat=${me.lat}&lon=${me.lon}`, 'nom', 1100);
+    const a = j && j.address, iso = a && a['ISO3166-2-lvl4'];
+    const name = a && (a.city || a.town || a.municipality || a.village);
+    if (name) { geoCache._auto = { lat: me.lat, lon: me.lon, text: iso ? `${name} - ${iso.split('-')[1]}` : name }; saveGeoCache(); }
+  } catch { /* sem internet: segue sem cidade */ }
+}
+
 function addrFields(s) {
   const a = splitAddr(s.raw);
-  const c = cityParts(city || s.cityGuess);
+  const c = cityParts(city || s.cityGuess || (geoCache._auto && geoCache._auto.text));
   const uf = c.uf || geoCache._uf || '';
   let bairro = a.rest;
   if (c.name) bairro = bairro.replace(new RegExp(c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i'), '');
@@ -166,7 +179,7 @@ function pickResult(list, bairros, cityTxt) {
   if (cityTxt) {
     const f = l.filter(r => norm(r.display_name).includes(norm(cityTxt)));
     if (f.length) l = f;
-  }
+  } else if (me) l = [...l].sort((x, y) => haversine(me, { lat: +x.lat, lon: +x.lon }) - haversine(me, { lat: +y.lat, lon: +y.lon }));
   for (const b of bairros) {
     const nb = norm(b);
     const hit = nb && l.find(r => norm(r.display_name).includes(nb));
