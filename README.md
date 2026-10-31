@@ -32,6 +32,9 @@ PWA · Sem login · Sem servidor próprio · Funciona offline
 | **Importa do WhatsApp** | Cole a conversa inteira; o app separa os endereços, ignora data, nome, emoji e numeração. |
 | **Monta a melhor rota** | Localiza cada endereço no mapa e calcula a ordem de entrega mais rápida. |
 | **Acompanha a entrega** | Cronômetro por parada (verde, amarelo, vermelho) e km medidos pelo GPS. |
+| **Segue você em tempo real** | Velocidade, quanto falta (km, minutos e hora de chegada), aviso de chegada e **recálculo automático** se você sair do caminho. |
+| **Evita trechos lentos** | Aprende pelo GPS onde você anda devagar (buraco, lombada, semáforo, trânsito) e você marca problemas com **⚠**. As próximas rotas fogem desses trechos. |
+| **Corrige endereço errado** | Acha o nome oficial da rua e o CEP certo mesmo com erro de digitação ou CEP errado. |
 | **Controla o dinheiro** | Ganho por entrega, fixo ou misto, gastos do dia e custo por km da moto. |
 | **Guarda o histórico** | Rotas finalizadas com ganho, km e custo, filtradas por período. |
 | **Funciona sem internet** | Baixe a cidade uma vez e use ruas, endereços e mapa offline. |
@@ -47,10 +50,17 @@ Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem 
 ```
 
 1. **＋ Nova rota**: cole o texto do WhatsApp. Cada colagem vira uma rota, com poucas ou muitas paradas.
-2. O app localiza os endereços ([Nominatim/OpenStreetMap](https://nominatim.org/)) e define a ordem mais rápida ([OSRM](https://project-osrm.org/)). As rotas ficam na tela principal e ainda não começaram.
-3. **▶ Iniciar**: o mapa vira a tela principal, o cronômetro começa e o GPS passa a medir os km rodados.
-4. **✓ Entregue** em cada parada.
+2. O app localiza os endereços (veja [Localização dos endereços](#-localização-dos-endereços)) e define a ordem de menor tempo ([OSRM](https://project-osrm.org/)), mostrando quanto você economiza em relação à ordem colada. As rotas ficam na tela principal e ainda não começaram.
+3. **▶ Iniciar**: o mapa vira a tela principal, o cronômetro começa e o GPS passa a medir os km rodados e a acompanhar sua posição.
+4. **✓ Entregue** em cada parada. A rota é recalculada a partir de onde você está.
 5. **⏹ Finalizar rota**: a rota vai para o histórico.
+
+### Durante a rota
+
+- Mostra **velocidade**, **quanto falta** (km, minutos e hora de chegada) e avisa quando você **chega** na parada.
+- Se você **sai do caminho** por mais de ~8 segundos, a rota é **recalculada sozinha** a partir da sua posição.
+- **⚠ Problema aqui** marca rua esburacada, lombada, semáforo ou trânsito no ponto onde você está. O app também aprende sozinho onde você anda devagar ou para. Esses trechos aparecem em vermelho no mapa e **custam mais** nas próximas rotas.
+- Aplicar os trechos lentos nas rotas exige o **pacote offline** da cidade (o servidor público online não aceita custos próprios). Dá para desligar ou apagar o aprendizado em ⚙.
 
 ### Telas
 
@@ -67,6 +77,22 @@ Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem 
 - **Como eu ganho**: *por entrega*, *fixo por dia* ou *fixo + por entrega*.
 - **Custo por km da moto**: calculado a partir de gasolina (R$/L), consumo (km/L), troca de óleo (R$ e a cada quantos km) e outros custos por km, como pneus e corrente.
 - **Cidade/UF padrão**: ajuda a achar endereços colados sem cidade.
+- **Trechos lentos**: liga ou desliga o uso do que foi aprendido e das suas marcações, e apaga tudo se quiser recomeçar.
+
+## 🔎 Localização dos endereços
+
+Cada endereço passa por estas fontes, na ordem, até ser achado:
+
+| # | Fonte | O que faz |
+|---|---|---|
+| 1 | Cache do aparelho | Endereço já localizado antes (e repetido na mesma lista) não é buscado de novo. |
+| 2 | [ViaCEP](https://viacep.com.br/) | Corrige o nome da rua digitado errado (Luís/Luiz, Moreti/Moretti) e acha o CEP certo. Também confere o CEP informado. |
+| 3 | [Nominatim](https://nominatim.org/) | Ponto exato da casa, quando o OpenStreetMap tem o número. |
+| 4 | [Photon](https://photon.komoot.io/) | Busca aproximada para nomes parecidos. |
+| 5 | CEP ([BrasilAPI](https://brasilapi.com.br/)) | Ponto aproximado da região, só se o CEP combinar com a rua. |
+| 6 | Pacote offline | Quando não há internet. |
+
+Se nada achar, a parada fica em **vermelho**: use **✎** para corrigir o texto ou **📍** para marcar o ponto no mapa. Paradas achadas só pela rua aparecem como `~ posição na rua`.
 
 ---
 
@@ -74,10 +100,25 @@ Todos os dados ficam **no próprio celular** (IndexedDB). Não há cadastro nem 
 
 GPS e instalação como app exigem **HTTPS** (ou `localhost`).
 
-**Opção mais simples (sem programar)**
-1. Arraste esta pasta em [app.netlify.com/drop](https://app.netlify.com/drop).
-2. Abra o link gerado no celular.
-3. No menu do Chrome, toque em **Adicionar à tela inicial** (ou em *📲 Instalar o app* nas configurações).
+**Publicar na Vercel** (HTTPS automático; o `vercel.json` já configura service worker, manifesto e cabeçalhos)
+
+*Pelo painel:*
+1. Coloque os arquivos na raiz de um repositório do GitHub.
+2. Em [vercel.com](https://vercel.com) → **Add New… → Project** → importe o repositório.
+3. **Framework Preset: Other**. Deixe *Build Command* e *Output Directory* em branco e clique em **Deploy**.
+
+*Pela linha de comando:*
+
+```bash
+npm i -g vercel
+vercel          # primeira vez: responda as perguntas (sem build, diretório atual)
+vercel --prod   # publica em produção
+```
+
+**No celular**
+1. Abra o link da Vercel no Chrome, uma vez com internet.
+2. Toque em **Adicionar à tela inicial** (ou em *📲 Instalar o app* nas configurações).
+3. A cada nova versão publicada, abra o app duas vezes para atualizar.
 
 **Testar no computador**
 
@@ -107,6 +148,7 @@ O app salva no aparelho:
 | 🗺️ **Mapa** | Blocos até o zoom 17. |
 
 **Ordem de prioridade na localização:** cache de endereços → internet (mais preciso) → pacote offline.
+Com trechos lentos aprendidos ou marcados, a rota passa a ser calculada no próprio aparelho, mesmo com internet.
 Quando a internet volta, os endereços aproximados são refinados ao tocar em **🧭 Recalcular rota**.
 
 Para liberar espaço, use **Configurações → Apagar pacote offline**.
@@ -137,13 +179,15 @@ Ele também reconhece:
  Texto do WhatsApp
         │  parse.js  → separa mensagens e endereços
         ▼
-  Geocodificação:  cache → Nominatim (online) → pacote offline
+  Localização:  cache → ViaCEP → Nominatim → Photon → CEP → pacote offline
         │
         ▼
-  Rota:  OSRM (online)  ou  Dijkstra + Held-Karp (offline)
+  Rota:  OSRM (online)  ou  Dijkstra + Held-Karp no aparelho
+         (o cálculo no aparelho aplica os trechos lentos aprendidos)
         │
         ▼
   app.js → mapa (Leaflet), cronômetro, GPS, ganhos, histórico
+  live.js → posição em tempo real, recálculo automático, aprendizado de trechos lentos
 ```
 
 - **Interface:** HTML + CSS + JavaScript puro, mapa com [Leaflet](https://leafletjs.com/).
@@ -161,8 +205,10 @@ Projeto_Motoboy/
 ├── index.html      Telas e diálogos
 ├── style.css       Estilos
 ├── app.js          Lógica principal: rotas, mapa, GPS, ganhos, histórico
-├── parse.js        Leitura do texto do WhatsApp e geocodificação
+├── parse.js        Leitura do texto do WhatsApp e localização dos endereços
 ├── offline.js      Pacote offline: download, busca de endereço e rota
+├── live.js         Tempo real: recálculo automático e trechos lentos
+├── vercel.json     Configuração de publicação na Vercel
 ├── sw.js           Service Worker (cache e uso offline)
 ├── manifest.json   Configuração do PWA
 ├── logo.png        Logo
@@ -176,8 +222,9 @@ Projeto_Motoboy/
 ## ⚠️ Limitações
 
 - **Online:** precisa de internet para localizar endereços e calcular a rota, a menos que a cidade tenha sido baixada. A interface e os dados salvos abrem sempre offline.
-- **Servidores públicos gratuitos** (Nominatim limitado a 1 req/s e OSRM demo): bons para uso pessoal, não para volume alto.
-- **Perfil de carro:** o OSRM público não tem perfil de moto.
+- **Servidores públicos gratuitos** (Nominatim limitado a 1 req/s, Photon, ViaCEP, OSRM demo, Overpass): bons para uso pessoal, não para volume alto. Uma lista grande leva cerca de 2 segundos por endereço.
+- **Perfil de carro e sem trânsito ao vivo:** o OSRM público não tem perfil de moto nem dados de trânsito. Os trechos lentos vêm do seu próprio GPS.
+- **Posição na rua:** quando o OpenStreetMap não tem o número da casa, o ponto fica na rua (marcado com `~`); use 📍 para ajustar.
 - **Km rodados:** medidos por GPS. Se o GPS registrar menos de 200 m, usa o km planejado (marcado com `~` no histórico).
 - **Offline:**
   - ruas sem cadastro no OpenStreetMap não são achadas (o app marca em vermelho para você corrigir);

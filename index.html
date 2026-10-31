@@ -34,9 +34,11 @@
         <div class="rb-name" id="rbName"></div>
         <div class="rb-main">
           <div><div class="lbl">Entrega atual</div><div id="rbLeg" class="clock">00:00</div><div id="rbTarget" class="muted"></div></div>
-          <div class="rb-side"><div id="rbTotal"></div><div id="rbAvg" class="muted"></div><div id="rbMoney" class="muted"></div></div>
+          <div class="rb-side"><div id="rbTotal"></div><div id="rbAvg" class="muted"></div><div id="rbMoney" class="muted"></div><div id="rbSpeed" class="speed"></div></div>
         </div>
+        <div id="rbEta" class="eta"></div>
         <div class="btns">
+          <button id="btnHaz">⚠ Problema aqui</button>
           <button id="btnList">☰ Lista</button>
           <button id="btnEnd" class="danger">⏹ Finalizar rota</button>
         </div>
@@ -167,6 +169,12 @@
       </label>
       <div id="costPreview" class="preview"></div>
 
+      <h3>Trechos lentos</h3>
+      <label class="check"><input type="checkbox" id="learnOn"> Evitar trechos lentos (aprendidos pelo GPS e marcados por mim)</label>
+      <p class="muted">Durante as rotas o app anota onde você anda devagar ou para (buraco, lombada, semáforo, trânsito). Precisa do pacote offline da cidade para aplicar nas rotas.</p>
+      <p class="muted" id="learnInfo"></p>
+      <button type="button" id="btnLearnDel" class="danger">Apagar o que foi aprendido</button>
+
       <h3>Pacote offline</h3>
       <p class="muted" id="packInfo"></p>
       <button type="button" id="btnPackDel" class="danger">Apagar pacote offline</button>
@@ -180,8 +188,21 @@
     </form>
   </dialog>
 
+  <dialog id="hzDlg">
+    <h2>⚠ Marcar problema aqui</h2>
+    <p class="muted">As próximas rotas evitam este trecho. Toque num marcador do mapa para remover.</p>
+    <div class="hzgrid">
+      <button data-hz="buraco">🕳️ Rua esburacada</button>
+      <button data-hz="lombada">🚧 Lombada</button>
+      <button data-hz="semaforo">🚦 Semáforo</button>
+      <button data-hz="transito">🚗 Trânsito / muito carro</button>
+    </div>
+    <div class="row"><button id="hzCancel">Cancelar</button></div>
+  </dialog>
+
   <script src="vendor/leaflet.js"></script>
   <script src="offline.js"></script>
+  <script src="live.js"></script>
   <script src="parse.js"></script>
   <script src="app.js"></script>
 </body>

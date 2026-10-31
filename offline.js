@@ -326,7 +326,9 @@ function dijkstra(P, src, targets) {
     if (t > time[u]) continue;
     if (left.delete(u) && !left.size) break;
     for (let e = P.off[u]; e < P.off[u + 1]; e++) {
-      const v = P.to[e], nt = t + P.len[e] / (P.spd[e] / 3.6);
+      const base = P.len[e] / (P.spd[e] / 3.6);
+      // P.cm / P.ca: trechos lentos aprendidos e problemas marcados (ver live.js)
+      const v = P.to[e], nt = t + (P.cm ? base * P.cm[e] + P.ca[e] : base);
       if (nt < time[v]) { time[v] = nt; dist[v] = dist[u] + P.len[e]; prev[v] = u; h.push(nt, v); }
     }
   }
@@ -412,7 +414,8 @@ function baselineCost(T, D) {
 async function offlineTrip(pts, start) {
   const P = OFF.pack;
   if (!packReady()) throw new Error('sem pacote offline');
-  const nodes = pts.map(p => (inPack(p.lat, p.lon) ? snapNode(P, p.lat, p.lon) : -1));
+  if (typeof prepareCosts === 'function') prepareCosts(P);      // aplica os trechos lentos aprendidos
+  const nodes =pts.map(p => (inPack(p.lat, p.lon) ? snapNode(P, p.lat, p.lon) : -1));
   if (nodes.some(u => u < 0)) throw new Error('ponto fora do pacote offline');
 
   const k = pts.length, tset = new Set(nodes);

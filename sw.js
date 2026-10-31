@@ -1,9 +1,9 @@
-const CACHE = 'finisboy-v11';
+const CACHE = 'finisboy-v12';
 const TILES = 'finisboy-tiles';       // blocos do mapa: sobrevivem às atualizações do app
 const MAX_TILES = 8000;
 
 const SHELL = [
-  './', './index.html', './style.css', './app.js', './parse.js', './offline.js', './manifest.json',
+  './', './index.html', './style.css', './app.js', './parse.js', './offline.js', './live.js', './manifest.json',
   './icon-192.png', './icon-512.png', './logo.png',
   './vendor/leaflet.js', './vendor/leaflet.css',
   './vendor/images/layers.png', './vendor/images/layers-2x.png',

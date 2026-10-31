@@ -166,3 +166,13 @@ label { display: block; font-size: 14px; color: var(--muted); }
 
 #netbar { background: #7c2d12; color: #ffedd5; font-size: 13px; padding: 5px 12px; }
 #btnInstall { width: 100%; margin-bottom: 10px; }
+
+/* Acompanhamento em tempo real */
+.speed { font-size: 20px; color: var(--text); }
+.eta { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.eta:empty { display: none; }
+.hz { width: 26px; height: 26px; display: grid; place-items: center; background: #fff; border: 2px solid #dc2626; border-radius: 50%; font-size: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.hzgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+.hzgrid button { padding: 16px 8px; font-size: 15px; }
+label.check { display: flex; gap: 8px; align-items: flex-start; color: var(--text); }
+label.check input { width: auto; margin: 3px 0 0; }

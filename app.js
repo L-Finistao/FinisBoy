@@ -160,11 +160,11 @@ function trackKm(p) {
 function setMe(p) {
   me = { lat: p.coords.latitude, lon: p.coords.longitude };
   drawMe();
-  if (session) trackKm(p);
+  if (session) { trackKm(p); learnFix(p); liveProgress(p); }
   if (Date.now() - lastSaved > 10000) {
     lastSaved = Date.now();
     DB.set('lastMe', me);
-    if (session) putRoute(session);
+    if (session) { putRoute(session); saveLearned(); }
   }
   if (!centered) {                       // primeira posição: mostra a cidade inteira, sem precisar de zoom
     centered = true;
@@ -281,8 +281,11 @@ async function optimize() {
   }
 
   setStatus('Calculando o melhor caminho…');
-  let res;
-  try {
+  let res = null;
+  if (packReady() && hasLearning()) {        // com trechos lentos aprendidos, usa o mapa do aparelho (aplica as penalidades)
+    try { res = await offlineTrip(pts, start); res.learned = true; } catch (e) { res = null; }
+  }
+  if (!res) try {
     if (!navigator.onLine) throw new Error('offline');
     try { res = await osrmBest(pts, start); } catch (e) { res = await osrmTrip(pts, start); }
   } catch (e) {
@@ -306,7 +309,8 @@ async function optimize() {
   r.geo = { coords: res.coords, distance: res.distance, duration: res.duration, approx: !!res.approx, baseline: res.baseline || null };
   const saved = res.baseline ? res.baseline.duration - res.duration : 0;
   lastInfo = `✓ Melhor rota: ${list.length} parada(s) · ${fmtDist(res.distance)} · ${fmtDur(res.duration)}` +
-    (saved > 60 ? ` · ${fmtDur(saved)} a menos que na ordem colada` : '');
+    (saved > 60 ? ` · ${fmtDur(saved)} a menos que na ordem colada` : '') +
+    (res.learned ? ' · evitando trechos lentos' : '');
   await putRoute(r);
   await Promise.all(list.map(s => DB.put(s)));
 }
@@ -346,6 +350,13 @@ const buildRoute = (fit = true) => run(async () => { await geocodeAll(); await o
 async function addFromText(text) {
   const addrs = parseText(text);
   if (!addrs.length) { setStatus('Nenhum endereço encontrado no texto.', 4000); return; }
+  // Alguns endereços vêm sem a UF ("Birigui" em vez de "Birigui - SP"): completa com a UF mais comum da lista.
+  const ufs = addrs.map(a => (/ - ([A-Z]{2})$/.exec(a.cityGuess || '') || [])[1]).filter(Boolean);
+  if (ufs.length) {
+    const top = ufs.sort((a, b) => ufs.filter(x => x === b).length - ufs.filter(x => x === a).length)[0];
+    for (const a of addrs) if (a.cityGuess && !/ - [A-Z]{2}$/.test(a.cityGuess)) a.cityGuess += ' - ' + top;
+    if (!geoCache._uf) geoCache._uf = top;
+  }
   const seq = ((await DB.get('routeSeq')) || 0) + 1;
   await DB.set('routeSeq', seq);
   const r = { id: newId(), name: 'Rota ' + seq, createdAt: Date.now(), status: 'pendente', km: 0 };
@@ -397,7 +408,8 @@ async function endRoute() {
     kmFinal: gps >= 200 ? gps : (r.kmPlan || r.geo?.distance || 0),
   });
   await putRoute(r);
-  session = null;
+  await saveLearned();
+  session = null; lastFix = null; arrived.clear();
   curId = active()[0]?.id || null;
   applySessionUI();
   render(true);
@@ -776,6 +788,7 @@ function renderMap(fit) {
     }
   }
   if (me) bounds.push([me.lat, me.lon]);
+  if (fit || !hazLayer) drawLearned();
   if (fit && bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: session ? 15 : 16 });
 }
 
@@ -898,8 +911,11 @@ function bind() {
     $('payPer').value = pay.perDelivery || ''; $('payFixed').value = pay.fixed || ''; fillCostInputs();
     syncPayInputs();
     $('packInfo').textContent = packInfo();
+    $('learnOn').checked = learnOn;
+    $('learnInfo').textContent = learnInfo();
     sdlg.showModal();
   };
+  $('btnLearnDel').onclick = async () => { if (!confirm('Apagar tudo o que o app aprendeu e as suas marcações de problemas?')) return; await clearLearned(); $('learnInfo').textContent = learnInfo(); };
   $('payMode').onchange = syncPayInputs;
   for (const k in COST_FIELDS) $(k).oninput = previewCost;
   $('setCancel').onclick = () => sdlg.close();
@@ -907,8 +923,10 @@ function bind() {
     target = Math.max(0, parseInt($('target').value, 10) || 0);
     city = $('cityS').value.trim();
     pay = { mode: $('payMode').value, perDelivery: parseMoney($('payPer').value), fixed: parseMoney($('payFixed').value), ...readCostInputs() };
-    await DB.set('target', target); await DB.set('city', city); await DB.set('pay', pay);
+    learnOn = $('learnOn').checked;
+    await DB.set('target', target); await DB.set('city', city); await DB.set('pay', pay); await DB.set('learnOn', learnOn);
     sdlg.close();
+    drawLearned();
     render();
   };
 
@@ -937,6 +955,7 @@ function bind() {
 
   document.body.addEventListener('click', e => {
     const b = e.target.closest('button[data-act]');
+    if (picking && !e.target.closest('#map') && !(b && b.dataset.act === 'pin')) { picking = null; setStatus(''); }   // cancelou a marcação
     if (b) {
       const { act, id } = b.dataset;
       if (act === 'done') markDone(id, true);
@@ -944,6 +963,7 @@ function bind() {
       else if (act === 'del') removeStop(id);
       else if (act === 'edit') editStop(id);
       else if (act === 'pin') placeOnMap(id);
+      else if (act === 'hzdel') removeHazard(id);
       else if (act === 'delx') removeExpense(id);
       else if (act === 'rstart') startRoute(id);
       else if (act === 'rdel') deleteRoute(id);
@@ -997,6 +1017,7 @@ async function migrate() {
   pay = { ...pay, ...((await DB.get('pay')) || {}) };
   geoCache = (await DB.get('geocache')) || {};
   loadPack(await DB.get('pack'));
+  await liveInit();
   me = (await DB.get('lastMe')) || null;      // última posição conhecida: abre já na sua cidade
   daySel = dayKey(Date.now());
 
@@ -1009,6 +1030,7 @@ async function migrate() {
   markersLayer = L.layerGroup().addTo(map);
 
   bind();
+  liveBind();
   document.body.classList.toggle('running', !!session);
   map.invalidateSize();
   drawMe();
