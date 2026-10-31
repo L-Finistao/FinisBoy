@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { sql, json, startSession, needPost } from './_lib.js';
+import { sql, json, startSession, needPost, serverHint } from './_lib.js';
 
 export default async function handler(req, res) {
   if (!needPost(req, res)) return;
@@ -17,6 +17,6 @@ export default async function handler(req, res) {
   } catch (e) {
     if (e.code === '23505') return json(res, 409, { error: 'Este e-mail já tem conta. Use Entrar.' });
     console.error(e);
-    json(res, 500, { error: 'Não foi possível criar a conta.' });
+    json(res, 500, { error: 'Não foi possível criar a conta. ' + serverHint(e) });
   }
 }

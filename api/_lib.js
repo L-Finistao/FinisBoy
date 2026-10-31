@@ -51,6 +51,15 @@ const key = () => new TextEncoder().encode(process.env.JWT_SECRET);
 
 export const json = (res, code, body) => res.status(code).json(body);
 
+// Diz ao usuário (sem vazar segredos) o que provavelmente está errado no servidor; o detalhe completo vai para os logs.
+export function serverHint(e) {
+  const m = String(e && e.message || e);
+  if (e && e.code === '42P01') return 'O banco ainda não tem as tabelas: rode o db/schema.sql no Neon.';
+  if (/JWT_SECRET|zero-length key|Key must be/i.test(m) || !process.env.JWT_SECRET) return 'Falta a variável JWT_SECRET na Vercel (Settings → Environment Variables) e um novo deploy.';
+  if (/connector|connect|token|Neon API|projeto Neon|ENOTFOUND|ECONN|fetch failed|password authentication/i.test(m)) return 'Não consegui conectar ao banco Neon (' + m.slice(0, 120) + ').';
+  return 'Erro no servidor: ' + m.slice(0, 120);
+}
+
 export async function startSession(res, userId) {
   const token = await new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
