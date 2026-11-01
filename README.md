@@ -129,18 +129,18 @@ Se nada achar, a parada fica em **vermelho**: use **✎** para corrigir o texto 
 
 GPS e instalação como app exigem **HTTPS** (ou `localhost`).
 
-**Publicar na Vercel** (HTTPS automático; o `vercel.json` já configura service worker, manifesto e cabeçalhos)
+**Publicar na Vercel** (HTTPS automático; o `next.config.mjs` já configura service worker, manifesto e cabeçalhos)
 
 *Pelo painel:*
 1. Coloque os arquivos na raiz de um repositório do GitHub.
 2. Em [vercel.com](https://vercel.com) → **Add New… → Project** → importe o repositório.
-3. **Framework Preset: Other**. Deixe *Build Command* e *Output Directory* em branco e clique em **Deploy**.
+3. **Framework Preset: Next.js** (em Settings → Build & Development, desligue qualquer *Override* de Build Command e Output Directory) e clique em **Deploy**.
 
 *Pela linha de comando:*
 
 ```bash
 npm i -g vercel
-vercel          # primeira vez: responda as perguntas (sem build, diretório atual)
+vercel          # primeira vez: responda as perguntas (framework Next.js)
 vercel --prod   # publica em produção
 ```
 
@@ -152,12 +152,11 @@ vercel --prod   # publica em produção
 **Testar no computador**
 
 ```bash
-python -m http.server 8080
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Depois abra <http://localhost:8080>.
-
-> O projeto é só HTML, CSS e JavaScript. Não tem `npm install` nem etapa de build.
+O projeto é Next.js (TypeScript): a API fica em `app/api/*/route.ts`, `lib/` guarda banco e sessão, e o app atual (HTML/JS puro) está em `public/` e abre em `/` enquanto as telas migram para React. Para o login funcionar localmente, ponha `DATABASE_URL` e `JWT_SECRET` no `.env.local`.
 
 ---
 
@@ -233,13 +232,16 @@ Ele também reconhece:
 Projeto_Motoboy/
 ├── index.html      Telas e diálogos
 ├── style.css       Estilos
+├── (os arquivos abaixo estão em public/)
 ├── app.js          Lógica principal: rotas, mapa, GPS, ganhos, histórico
 ├── parse.js        Leitura do texto do WhatsApp e localização dos endereços
 ├── offline.js      Pacote offline: download, busca de endereço e rota
 ├── live.js         Tempo real: recálculo automático e trechos lentos
 ├── earnings.js     Períodos de trabalho, ganhos, gastos e telas Dia/Histórico
 ├── history.js      Trajeto gravado e histórico no mapa (parte a parte)
-├── vercel.json     Configuração de publicação na Vercel
+├── next.config.mjs Cabeçalhos e rota inicial (Next.js)
+├── app/api/        API em Next.js: login, register, logout, me, sync
+├── lib/            Banco (Neon) e sessão (JWT)
 ├── sw.js           Service Worker (cache e uso offline)
 ├── manifest.json   Configuração do PWA
 ├── logo.png        Logo
@@ -276,7 +278,7 @@ O app exige login. Cada usuário tem a própria conta e só enxerga os próprios
 
 **Como ligar (uma vez):**
 1. No [Neon](https://neon.tech), crie um projeto e rode [db/schema.sql](db/schema.sql) no *SQL Editor*.
-2. Vincule o conector (`vercel connect create neon --name fiinsboy`, depois `vercel link` e `vercel env pull`): a conexão vem do Vercel Connect (`getTokenResponse('neon/fiinsboy')` em [api/_lib.js](api/_lib.js)), sem `DATABASE_URL`. Na Vercel (Settings → Environment Variables) crie `JWT_SECRET` (texto longo e aleatório) e, se quiser restringir quem cria conta, `SIGNUP_CODE`. Veja [.env.example](.env.example).
-3. Faça o deploy. A Vercel instala as dependências de [package.json](package.json) e publica as funções de `api/`.
+2. Vincule o conector (`vercel connect create neon --name fiinsboy`, depois `vercel link` e `vercel env pull`): a conexão vem do Vercel Connect (`getTokenResponse('neon/fiinsboy')` em [lib/db.ts](lib/db.ts)), sem `DATABASE_URL`. Na Vercel (Settings → Environment Variables) crie `JWT_SECRET` (texto longo e aleatório) e, se quiser restringir quem cria conta, `SIGNUP_CODE`. Veja [.env.example](.env.example).
+3. Faça o deploy. A Vercel instala as dependências de [package.json](package.json) e publica as rotas de `app/api/`.
 
-**Como funciona:** `api/register`, `api/login`, `api/logout` e `api/me` cuidam do login (senha com bcrypt, sessão em cookie `HttpOnly` assinado, 30 dias). `api/sync` envia e baixa as mudanças só do usuário do cookie. Rotas, paradas, entregas, gastos, trajetos e configurações vão para a tabela `docs`. Se a mesma coisa mudar em dois aparelhos, vale a alteração mais recente. O pacote offline e o cache de endereços ficam só no aparelho. Ao trocar de conta no mesmo aparelho, os dados locais da conta anterior são apagados (já estão no servidor).
+**Como funciona:** `/api/register`, `/api/login`, `/api/logout` e `/api/me` cuidam do login (senha com bcrypt, sessão em cookie `HttpOnly` assinado, 30 dias). `api/sync` envia e baixa as mudanças só do usuário do cookie. Rotas, paradas, entregas, gastos, trajetos e configurações vão para a tabela `docs`. Se a mesma coisa mudar em dois aparelhos, vale a alteração mais recente. O pacote offline e o cache de endereços ficam só no aparelho. Ao trocar de conta no mesmo aparelho, os dados locais da conta anterior são apagados (já estão no servidor).
