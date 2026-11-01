@@ -198,7 +198,28 @@ async function nominatim(q) {
 
 const mk = (lat, lon, label, precision, src = 'online') => ({ lat, lon, label, precision, approx: precision !== 'house', src });
 
+// CEP válido: 8 dígitos e não tudo zero (00000-000 é preenchimento de formulário).
+const validCep = c => { const d = String(c || '').replace(/\D/g, ''); return d.length === 8 && !/^0+$/.test(d) ? d : ''; };
+
 async function geocodeOnline(s, f) {
+  // Com CEP válido no texto, ele manda: o ViaCEP dá rua, bairro e cidade certos, e a busca usa CEP + número.
+  const cepD = validCep(s.cep);
+  if (cepD) {
+    let c = await getJSON(`https://viacep.com.br/ws/${cepD}/json/`, 'cep', 150);
+    if (!c || c.erro || !c.logradouro) {                                                     // plano B: BrasilAPI (outras bases de CEP)
+      const b = await getJSON(`https://brasilapi.com.br/api/cep/v2/${cepD}`, 'cep', 150).catch(() => null);
+      c = b && b.street ? { logradouro: b.street, bairro: b.neighborhood, localidade: b.city, uf: b.state } : null;
+    }
+    if (c && c.logradouro) {
+      const hy = cepD.slice(0, 5) + '-' + cepD.slice(5), cf = { ...f, street: c.logradouro, city: c.localidade || f.city, uf: c.uf || f.uf, bairro: c.bairro || f.bairro };
+      const where = [cf.city, cf.uf].filter(Boolean).join(', ');
+      for (const q of [[c.logradouro, f.num, c.bairro, where, hy], [c.logradouro, f.num, where]].map(a => a.filter(Boolean).join(', '))) {
+        const pick = pickResult(await nominatim(q), [c.bairro].filter(Boolean), cf.city);
+        if (pick && hasHouse(pick)) return mk(+pick.lat, +pick.lon, pick.display_name, 'house');
+      }
+      f = cf;                                                                                 // o resto da busca usa a rua/cidade do CEP
+    }
+  }
   const canon = await resolveStreet(f, s.cep);
   const street = canon ? canon.name : f.street.replace(/^R\.\s*/i, 'Rua ').replace(/^Av\.\s*/i, 'Avenida ');
   const bairros = [f.bairro, canon && canon.bairro].filter(Boolean);
@@ -238,7 +259,7 @@ async function geocodeOnline(s, f) {
 
 async function geocode(s) {
   const f = addrFields(s);
-  const key = 'g|' + stripType(f.street) + '|' + (f.num ?? '') + '|' + norm(f.bairro) + '|' + norm(f.city);
+  const key = 'g|' + stripType(f.street) + '|' + (f.num ?? '') + '|' + norm(f.bairro) + '|' + norm(f.city) + '|' + validCep(s.cep);
   if (geoCache[key]) return geoCache[key];
 
   let netErr = null, res = null;

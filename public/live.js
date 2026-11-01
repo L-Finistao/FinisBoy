@@ -402,7 +402,7 @@ function liveProgress(p) {
   if (nxt && curId === r.id && haversine(me, nxt) < 35 && !arrived.has(nxt.id)) {
     arrived.add(nxt.id);
     setStatus('📍 Você chegou: toque em ✓ Entregue quando entregar.', 6000);
-    say('Você chegou: ' + shortAddr(nxt) + '.', 'arr' + nxt.id);
+    say('Você chegou: ' + spokenAddr(nxt) + '.', 'arr' + nxt.id);
     if (navigator.vibrate) navigator.vibrate(200);
   }
 

@@ -12,7 +12,7 @@ const saidAt = {};
 const WAKE = /\b(finis|finish|fines|finisboy|finis boy|assistente)\b/;
 
 const plain = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-const shortAddr = s => String(s.raw || 'endereço sem nome').split(/\s[-–]\s|;|\(/)[0].slice(0, 70);
+const spokenAddr = s => String(s.raw || 'endereço sem nome').split(/\s[-–]\s|;|\(/)[0].slice(0, 70);
 
 /* ---------- Fala ---------- */
 function say(text, key, urgent) {
@@ -34,7 +34,7 @@ function nextStopText() {
   const n = pending().find(s => s.lat != null) || pending()[0];
   if (!n) return 'Não há paradas pendentes.';
   const d = typeof me !== 'undefined' && me && n.lat != null ? ', a ' + fmtDist(haversine(me, n)) : '';
-  return 'Próxima parada: ' + shortAddr(n) + d + '.';
+  return 'Próxima parada: ' + spokenAddr(n) + d + '.';
 }
 
 /* ---------- Comandos ---------- */
@@ -65,7 +65,7 @@ async function voiceCommand(raw) {
   if (/\b(entreg(ue|ou|a)|feito|concluida|concluido|entreguei)\b/.test(t)) {
     const n = pending()[0];
     if (!n || curId !== session.id) { say('Não há entrega pendente.'); return; }
-    say('Entrega registrada: ' + shortAddr(n) + '.');
+    say('Entrega registrada: ' + spokenAddr(n) + '.');
     await markDone(n.id, true);                                  // markDone fala a próxima parada ou o fim da rota
     return;
   }
