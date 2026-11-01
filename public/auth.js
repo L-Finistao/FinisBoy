@@ -211,7 +211,7 @@ async function authGate() {
   let first = true;
   while (!authUser) {                                          // obrigatório entrar (a primeira vez precisa de internet)
     const why = !r ? 'Sem conexão com o servidor. Conecte-se à internet para entrar.'
-      : r.status === 404 ? 'O servidor de contas não está configurado neste endereço (rode com `vercel dev` ou publique na Vercel).'
+      : r.status === 404 ? 'O servidor de contas não está configurado neste endereço (rode com `npm run dev` ou publique na Vercel com o framework Next.js).'
       : r.status >= 500 ? 'O servidor de contas está com problema (' + r.status + '). Veja os logs da Vercel.' : '';
     await showLogin(first ? why : '');
     first = false;

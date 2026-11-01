@@ -1,4 +1,4 @@
-const CACHE = 'finisboy-v32';
+const CACHE = 'finisboy-v33';
 const TILES = 'finisboy-tiles';       // blocos do mapa: sobrevivem às atualizações do app
 const MAX_TILES = 8000;
 
