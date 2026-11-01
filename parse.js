@@ -89,7 +89,9 @@ async function gate(host, ms) {
 async function getJSON(url, host, ms) {
   for (let i = 0; i < 3; i++) {
     await gate(host, ms);
-    const r = await fetch(url);
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+    let r;
+    try { r = await fetch(url, { signal: ctl.signal }); } finally { clearTimeout(tm); }
     if (r.status === 429 || r.status >= 500) { await sleep(1500 * (i + 1)); continue; }   // servidor ocupado: espera e tenta de novo
     if (r.status === 400 || r.status === 404) return null;
     if (!r.ok) throw new Error(host + ' ' + r.status);

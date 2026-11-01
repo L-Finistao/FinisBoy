@@ -369,8 +369,9 @@ function setStatus(msg, ms) {
   if (msg && ms) statusTimer = setTimeout(() => setStatus(''), ms);
 }
 
+let rerun = null;
 async function run(fn, { fit = true } = {}) {
-  if (busy) return;
+  if (busy) { rerun = { fn, fit }; return; }          // já calculando: refaz logo depois (não perde o endereço que acabou de entrar)
   busy = true;
   document.querySelectorAll('button').forEach(b => (b.disabled = true));
   try {
@@ -385,12 +386,15 @@ async function run(fn, { fit = true } = {}) {
     busy = false;
     document.querySelectorAll('button').forEach(b => (b.disabled = false));
     render(fit);
+    if (rerun) { const n = rerun; rerun = null; run(n.fn, { fit: n.fit }); }
   }
 }
 
 const buildRoute = (fit = true) => run(async () => { await geocodeAll(); await optimize(); }, { fit });
 
-// Cada colagem de endereços vira uma rota nova, que pode ser iniciada separadamente.
+// Endereços novos entram na rota atual (pendente ou em andamento); só cria rota nova se não houver nenhuma para iniciar.
+const addTarget = () => { const c = cur(); return c && c.status !== 'finalizada' ? c : active()[0] || null; };
+
 async function addFromText(text, profileId) {
   const addrs = parseText(text);
   if (!addrs.length) { setStatus('Nenhum endereço encontrado no texto.', 4000); return; }
@@ -407,17 +411,21 @@ async function addFromText(text, profileId) {
     const topCity = cities.sort((a, b) => cities.filter(x => x === b).length - cities.filter(x => x === a).length)[0];
     for (const a of addrs) if (!a.cityGuess) a.cityGuess = topCity;
   }
-  const seq = ((await DB.get('routeSeq')) || 0) + 1;
-  await DB.set('routeSeq', seq);
-  const r = { id: newId(), name: 'Rota ' + seq, createdAt: Date.now(), status: 'pendente', km: 0, profileId: normPid(profileId || defaultProfileId()) };
-  routes.push(r);
-  await putRoute(r);
+  let r = addTarget();
+  if (!r) {
+    const seq = ((await DB.get('routeSeq')) || 0) + 1;
+    await DB.set('routeSeq', seq);
+    r = { id: newId(), name: 'Rota ' + seq, createdAt: Date.now(), status: 'pendente', km: 0, profileId: normPid(profileId || defaultProfileId()) };
+    routes.push(r);
+    await putRoute(r);
+  }
+  const base = routeStops(r.id).length;
   for (const [i, a] of addrs.entries()) {
     const s = {
       id: newId(), routeId: r.id,
       raw: a.raw, note: a.note, cep: a.cep, cityGuess: a.cityGuess,
       sender: a.sender, when: a.when, addedAt: Date.now(),
-      lat: null, lon: null, done: false, order: 1000 + i,
+      lat: null, lon: null, done: false, order: 1000 + base + i,
     };
     stops.push(s);
     await DB.put(s);
@@ -425,6 +433,7 @@ async function addFromText(text, profileId) {
   curId = r.id;
   showTab('routes');
   render();
+  setStatus(`${addrs.length} endereço(s) adicionado(s) em "${r.name}".`, 3000);
   await buildRoute();
 }
 
@@ -848,6 +857,11 @@ function bind() {
   const dlg = $('addDlg');
   $('btnAdd').onclick = () => {
     $('city').value = city; $('txt').value = '';
+    const t = addTarget();
+    $('addTitle').textContent = t ? 'Adicionar endereços' : 'Nova rota';
+    $('addHint').textContent = t ? `Cole os endereços: eles entram em "${t.name}" e a rota é recalculada.` : 'Cole a mensagem do WhatsApp com os endereços.';
+    $('routeProfWrap').hidden = !!t;
+    $('addSubmit').textContent = t ? 'Adicionar' : 'Criar rota';
     $('routeProfile').innerHTML = profileOptions(defaultProfileId());      // período pelo horário (ou o último usado)
     dlg.showModal(); $('txt').focus();
   };

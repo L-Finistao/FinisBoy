@@ -150,9 +150,9 @@
 
   <dialog id="addDlg">
     <form method="dialog" id="addForm">
-      <h2>Nova rota</h2>
-      <p class="muted">Cole a mensagem do WhatsApp com os endereços. Tudo o que você colar agora vira uma rota (poucas ou muitas paradas).</p>
-      <label>Período de trabalho
+      <h2 id="addTitle">Nova rota</h2>
+      <p class="muted" id="addHint">Cole a mensagem do WhatsApp com os endereços.</p>
+      <label id="routeProfWrap">Período de trabalho
         <select id="routeProfile"></select>
       </label>
       <textarea id="txt" rows="9" placeholder="[29/10, 21:23] +55 18 99764-0397: Rua das Flores, 123 - Centro&#10;..."></textarea>
@@ -161,7 +161,7 @@
       </label>
       <div class="row">
         <button type="button" id="btnCancel">Cancelar</button>
-        <button type="submit" class="primary">Criar rota</button>
+        <button type="submit" class="primary" id="addSubmit">Criar rota</button>
       </div>
     </form>
   </dialog>
