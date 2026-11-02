@@ -34,6 +34,15 @@ export default function Rotas() {
   const [open, setOpen] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [sheetH, setSheetH] = useState(260);
+  // altura real da folha inferior: o mapa enquadra a rota na parte que continua visível
+  const [sheetEl, setSheetEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!sheetEl) return;
+    const ro = new ResizeObserver(() => setSheetH(sheetEl.offsetHeight));
+    ro.observe(sheetEl); setSheetH(sheetEl.offsetHeight);
+    return () => ro.disconnect();
+  }, [sheetEl]);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   // ao iniciar a corrida o mapa acompanha você de novo
@@ -75,7 +84,7 @@ export default function Rotas() {
 
   const map = (
     <MapView route={cur} stops={mine} me={app.me} picking={!!app.picking} follow={follow}
-      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} bottomPad={isRun ? (expanded ? 360 : 250) : 0} />
+      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} bottomPad={isRun ? sheetH : 0} />
   );
   const locateBtn = (
     <button className="icon-btn locate" aria-label="Centralizar em mim" onClick={() => { setFollow(true); setCenter(c => c + 1); void A.getPosition(); }}><Icon n="locate" /></button>
@@ -98,7 +107,7 @@ export default function Rotas() {
         {pickHint}
         {app.status && !app.picking && <div className="status runstatus" role="status">{app.status}</div>}
 
-        <section className={`rsheet ${expanded ? 'open' : ''}`}>
+        <section ref={setSheetEl} className={`rsheet ${expanded ? 'open' : ''}`}>
           <button className="handle" aria-label={expanded ? 'Recolher' : 'Expandir'} onClick={() => setExpanded(v => !v)} />
           <div className="rowb">
             <div><div className="eyebrow">{running.name} · entrega atual</div><div className="clock">{fmtClock(leg)}</div></div>

@@ -57,7 +57,7 @@ export default function MapView({ route, stops, me, picking, follow, onPick, onD
       }
     }
     // enquadra quando troca de rota ou o traçado muda (não a cada ponto do GPS)
-    const sig = route ? route.id + ':' + route.status + ':' + (route.geo ? route.geo.distance.toFixed(0) : '') + ':' + stops.length : '';
+    const sig = route ? route.id + ':' + route.status + ':' + Math.round(bottomPad / 40) + ':' + (route.geo ? route.geo.distance.toFixed(0) : '') + ':' + stops.length : '';
     if (bounds.length && fitted.current !== sig) {
       fitted.current = sig;
       if (me) bounds.push([me.lat, me.lon]);

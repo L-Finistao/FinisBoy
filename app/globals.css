@@ -1,18 +1,13 @@
 /* FinisBoy — design system. Verde de marca, cartões brancos sobre fundo esverdeado, tipografia do sistema.
    Tokens claros em :root, escuros em prefers-color-scheme. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #eef3ef; --card: #ffffff; --ink: #14221b; --muted: #6a7a72; --faint: #98a69e; --line: #e3eae5;
   --brand: #1b8c5a; --brand-600: #167a4d; --brand-soft: #e3f4ea; --brand-ink: #0f5a38;
   --dark: #14221b; --dark-ink: #ffffff;
   --warn: #b7791f; --warn-soft: #fdf3dc; --bad: #c24141; --bad-soft: #fde9e9;
   --sh: 0 1px 2px rgba(20, 34, 27, .05), 0 4px 14px rgba(20, 34, 27, .06);
   --r: 18px; --r-s: 12px;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0e1612; --card: #17221c; --ink: #eaf2ed; --muted: #93a49a; --faint: #62736a; --line: #243229;
-    --brand: #34b27a; --brand-600: #2c9d6b; --brand-soft: #173a2a; --brand-ink: #8be0b4;
-    --dark: #eaf2ed; --dark-ink: #0e1612; --warn-soft: #3a2f14; --bad-soft: #3b1d1d; --bad: #f08a8a; --sh: 0 1px 2px #0006; }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
@@ -42,7 +37,7 @@ button:disabled { opacity: .5; pointer-events: none; }
 /* Formulários */
 form { display: flex; flex-direction: column; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
-input, select, textarea { font: inherit; color: var(--ink); padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--card); }
+input, select, textarea { width: 100%; min-width: 0; font: inherit; color: var(--ink); padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--card); }
 
 /* Página simples (entrar, ajustes) */
 .page { max-width: 480px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
@@ -124,7 +119,8 @@ input, select, textarea { font: inherit; color: var(--ink); padding: 11px 12px; 
 .overlay { position: fixed; inset: 0; background: #0008; display: flex; align-items: flex-end; justify-content: center; z-index: 1000; }
 .sheet { background: var(--card); width: 100%; max-width: 560px; border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
 .sheet h2 { font-size: 1.2rem; }
-.row { display: flex; gap: 10px; } .row > * { flex: 1; }
+.row { display: flex; gap: 10px; } .row > * { flex: 1; min-width: 0; }
+.two > *, .grid2 > *, .grid3 > * { min-width: 0; }
 .empty { text-align: center; padding: 28px 16px; color: var(--muted); }
 
 /* Marcadores do mapa */
