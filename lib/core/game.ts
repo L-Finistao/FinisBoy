@@ -16,7 +16,7 @@ export interface GameCfg {
   challengeDone: Record<string, string>;              // dia -> desafio concluído
 }
 export const DEFAULT_CFG: GameCfg = {
-  nick: '', avatar: '🏍️', accessory: '', frame: 'verde', companion: 'turbo', bonds: {}, theme: 'verde', goals: { dayDeliveries: 10, dayGain: 0, weekDeliveries: 50, weekGain: 0 }, hitDays: [], challengeDone: {},
+  nick: '', avatar: '🏍️', accessory: '', frame: 'verde', companion: 'turbo', bonds: {}, theme: 'turbo', goals: { dayDeliveries: 10, dayGain: 0, weekDeliveries: 50, weekGain: 0 }, hitDays: [], challengeDone: {},
 };
 
 /* ---------- Personalização (desbloqueada por nível) ---------- */
@@ -25,6 +25,7 @@ export const AVATARS = [
   { e: '🚀', lvl: 6 }, { e: '🦅', lvl: 8 }, { e: '🔥', lvl: 10 }, { e: '👑', lvl: 15 }, { e: '🐉', lvl: 20 },
 ];
 export const THEMES = [
+  { id: 'turbo', name: 'Turbo', lvl: 1, brand: '#5f8a1e', b600: '#4d7216' },      // padrão: segue o claro/escuro do sistema
   { id: 'verde', name: 'Verde', lvl: 1, brand: '#1b8c5a', b600: '#167a4d', soft: '#e3f4ea', ink: '#0f5a38' },
   { id: 'laranja', name: 'Laranja', lvl: 2, brand: '#e8650a', b600: '#c75606', soft: '#fdeadb', ink: '#8a3c04' },
   { id: 'azul', name: 'Azul', lvl: 3, brand: '#2563eb', b600: '#1d4fc4', soft: '#e0eaff', ink: '#173b94' },

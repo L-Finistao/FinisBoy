@@ -91,8 +91,8 @@ export default function MapView({ route, stops, me, picking, follow, onPick, onD
       const a = coords[near.i], b = coords[near.i + 1];
       const at: [number, number] = [a[0] + (b[0] - a[0]) * near.t, a[1] + (b[1] - a[1]) * near.t];
       L.polyline([...coords.slice(0, near.i + 1), at], { color: '#98A2B3', weight: 4, opacity: 0.7, interactive: false }).addTo(g);
-      L.polyline([at, ...coords.slice(near.i + 1)], { color: '#FF6B00', weight: 5, opacity: 0.85 }).addTo(g);
-    } else L.polyline(coords, { color: '#FF6B00', weight: 5, opacity: 0.85 }).addTo(g);
+      L.polyline([at, ...coords.slice(near.i + 1)], { color: '#e84b31', weight: 5, opacity: 0.85 }).addTo(g);
+    } else L.polyline(coords, { color: '#e84b31', weight: 5, opacity: 0.85 }).addTo(g);
   }, [route?.geo, route?.status, route?.id, near?.i, near?.t, near?.d]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aprendizado: problemas marcados, vias favoritas e trechos lentos

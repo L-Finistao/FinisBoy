@@ -3,8 +3,8 @@
   "short_name": "TurboSlug",
   "start_url": "/rotas",
   "display": "standalone",
-  "background_color": "#14221b",
-  "theme_color": "#14221b",
+  "background_color": "#0d0a31",
+  "theme_color": "#0d0a31",
   "lang": "pt-BR",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

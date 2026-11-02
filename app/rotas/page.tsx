@@ -223,7 +223,7 @@ export default function Rotas() {
 
   /* ---------- Planejamento ---------- */
   return (
-    <Shell running={!!running} action={<button className="dark" onClick={() => setAdding(true)}><Icon n="plus" />Nova rota</button>}>
+    <Shell running={!!running} action={<button className="primary" onClick={() => setAdding(true)}><Icon n="plus" />Nova rota</button>}>
       {game && <GameCard game={game} cfg={cfg} name={sync.user.name || 'Piloto'} />}
       <div className="mapcard">
         {map}

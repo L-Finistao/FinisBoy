@@ -17,7 +17,8 @@ export default function GameLayer() {
   // tema
   useEffect(() => {
     const t = THEMES.find(x => x.id === cfg.theme) || THEMES[0], s = document.documentElement.style;
-    s.setProperty('--brand', t.brand); s.setProperty('--brand-600', t.b600); s.setProperty('--brand-soft', t.soft); s.setProperty('--brand-ink', t.ink);
+    if (t.id === 'turbo') { s.removeProperty('--brand'); s.removeProperty('--brand-600'); }   // padrão: cores do CSS (claro/escuro)
+    else { s.setProperty('--brand', t.brand); s.setProperty('--brand-600', t.b600); }           // soft/ink são derivados no CSS
   }, [cfg.theme]);
 
   // +XP
@@ -74,7 +75,7 @@ export default function GameLayer() {
       {cur && (
         <div className="overlay party" onClick={() => setQueue(q => q.slice(1))}>
           <div className="confetti" aria-hidden="true">
-            {Array.from({ length: 40 }, (_, i) => <i key={i} style={{ left: `${(i * 37) % 100}%`, background: ['#f59e0b', '#1b8c5a', '#2563eb', '#db2777', '#7c3aed'][i % 5], animationDelay: `${(i % 10) * 0.12}s`, animationDuration: `${2.2 + (i % 5) * 0.4}s` }} />)}
+            {Array.from({ length: 40 }, (_, i) => <i key={i} style={{ left: `${(i * 37) % 100}%`, background: ['#f0d522', '#a1d835', '#54c5f1', '#e84b31', '#92b6dd'][i % 5], animationDelay: `${(i % 10) * 0.12}s`, animationDuration: `${2.2 + (i % 5) * 0.4}s` }} />)}
           </div>
           <div className="partycard" onClick={e => e.stopPropagation()}>
             <div className="bigicon">{cur.icon}</div>
