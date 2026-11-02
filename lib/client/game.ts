@@ -15,7 +15,7 @@ const subscribe = (f: () => void) => { subs.add(f); return () => { subs.delete(f
 async function load() {
   if (ready) return;
   const c = await local.kvGet<Partial<GameCfg>>('game');
-  cfg = { ...DEFAULT_CFG, ...c, goals: { ...DEFAULT_CFG.goals, ...c?.goals }, bonds: c?.bonds || {}, hitDays: c?.hitDays || [], challengeDone: c?.challengeDone || {} };
+  cfg = { ...DEFAULT_CFG, ...c, goals: { ...DEFAULT_CFG.goals, ...c?.goals }, look: { ...DEFAULT_CFG.look, ...c?.look }, bonds: c?.bonds || {}, hitDays: c?.hitDays || [], challengeDone: c?.challengeDone || {} };
   ready = true; emit();
 }
 

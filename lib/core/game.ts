@@ -1,5 +1,7 @@
 import { collect, dayKey, periodStart, sumSlots, todayGross, type Ctx } from './earnings';
 import type { Route, Stop } from './types';
+import { BAGS, DEFAULT_LOOK, GLASSES, HAIRS, HAIR_COLORS, HELMETS, OUTFITS, VEHICLES, VEHICLE_COLORS, type Look, type Unlockable } from './rider';
+export { isUnlocked, unlockHint, type Unlockable } from './rider';
 
 /* Gamificação. Tudo é CALCULADO a partir do que o app já guarda (entregas, rotas, km, ganhos): o mesmo resultado em qualquer
    aparelho, funciona offline e nunca perde pontos. Só a configuração do jogador (apelido, avatar, tema, metas e o que já foi
@@ -7,8 +9,8 @@ import type { Route, Stop } from './types';
 
 export interface Goals { dayDeliveries: number; dayGain: number; weekDeliveries: number; weekGain: number }
 export interface GameCfg {
-  nick: string; avatar: string; theme: string; goals: Goals;
-  accessory: string; frame: string;                   // personagem: acessório (emoji) e moldura
+  nick: string; theme: string; look: Look; goals: Goals;
+  frame: string;                                      // moldura do personagem
   companion: string; bonds: Record<string, number>;   // companheiro de viagem ativo e entregas feitas com cada um
   bondMark?: number;                                  // total de entregas já contado nos laços
   seen?: { level: number; ach: string[] };           // o que já foi comemorado (não repete a festa)
@@ -16,14 +18,15 @@ export interface GameCfg {
   challengeDone: Record<string, string>;              // dia -> desafio concluído
 }
 export const DEFAULT_CFG: GameCfg = {
-  nick: '', avatar: '🏍️', accessory: '', frame: 'verde', companion: 'turbo', bonds: {}, theme: 'turbo', goals: { dayDeliveries: 10, dayGain: 0, weekDeliveries: 50, weekGain: 0 }, hitDays: [], challengeDone: {},
+  nick: '', look: DEFAULT_LOOK, frame: 'verde', companion: 'turbo', bonds: {}, theme: 'turbo', goals: { dayDeliveries: 10, dayGain: 0, weekDeliveries: 50, weekGain: 0 }, hitDays: [], challengeDone: {},
 };
 
 /* ---------- Personalização (desbloqueada por nível) ---------- */
-export const AVATARS = [
-  { e: '🏍️', lvl: 1 }, { e: '🛵', lvl: 1 }, { e: '🚴', lvl: 2 }, { e: '🦊', lvl: 3 }, { e: '🐆', lvl: 4 },
-  { e: '🚀', lvl: 6 }, { e: '🦅', lvl: 8 }, { e: '🔥', lvl: 10 }, { e: '👑', lvl: 15 }, { e: '🐉', lvl: 20 },
-];
+// Itens do boneco (capacete, bolsa, veículo…) que abrem entre dois níveis: usado para avisar "você desbloqueou".
+export function unlockedBetween(from: number, to: number) {
+  const all: Unlockable[] = [...HAIRS, ...HELMETS, ...GLASSES, ...BAGS, ...VEHICLES, ...OUTFITS, ...HAIR_COLORS, ...VEHICLE_COLORS, ...FRAMES, ...COMPANIONS];
+  return [...new Set(all.filter(u => !u.ach && u.lvl > from && u.lvl <= to).map(u => u.name))];
+}
 export const THEMES = [
   { id: 'turbo', name: 'Turbo', lvl: 1, brand: '#5f8a1e', b600: '#4d7216' },      // padrão: segue o claro/escuro do sistema
   { id: 'verde', name: 'Verde', lvl: 1, brand: '#1b8c5a', b600: '#167a4d', soft: '#e3f4ea', ink: '#0f5a38' },
@@ -33,22 +36,14 @@ export const THEMES = [
   { id: 'rosa', name: 'Rosa', lvl: 8, brand: '#db2777', b600: '#b81e62', soft: '#fde1ee', ink: '#8a1448' },
   { id: 'dourado', name: 'Dourado', lvl: 12, brand: '#b7791f', b600: '#96610f', soft: '#fbefd3', ink: '#6b450a' },
 ];
-export const ACCESSORIES: Unlockable[] = [
-  { e: '', name: 'Nenhum', lvl: 1 }, { e: '🧢', name: 'Boné', lvl: 2 }, { e: '😎', name: 'Óculos', lvl: 3 }, { e: '⛑️', name: 'Capacete', lvl: 4 },
-  { e: '🎧', name: 'Fone', lvl: 6 }, { e: '🏴‍☠️', name: 'Pirata', lvl: 9 }, { e: '🎩', name: 'Cartola', lvl: 11 }, { e: '🥇', name: 'Medalha', lvl: 1, ach: 'd100' },
-  { e: '🔥', name: 'Chamas', lvl: 1, ach: 's7' }, { e: '⚡', name: 'Raio', lvl: 1, ach: 'fast' }, { e: '👑', name: 'Coroa', lvl: 18 },
-];
 export const FRAMES: (Unlockable & { id: string; color: string })[] = [
   { id: 'verde', e: '', name: 'Padrão', lvl: 1, color: '' }, { id: 'prata', e: '', name: 'Prata', lvl: 4, color: '#94a3b8' },
   { id: 'ouro', e: '', name: 'Ouro', lvl: 8, color: '#f5b301' }, { id: 'fogo', e: '', name: 'Fogo', lvl: 1, ach: 's3', color: '#ef4444' },
   { id: 'neon', e: '', name: 'Neon', lvl: 14, color: '#22d3ee' }, { id: 'diamante', e: '', name: 'Diamante', lvl: 1, ach: 'd500', color: '#a78bfa' },
 ];
-export interface Unlockable { e: string; name: string; lvl: number; ach?: string }
-export const isUnlocked = (u: Unlockable, level: number, unlockedAch: string[]) => level >= u.lvl && (!u.ach || unlockedAch.includes(u.ach));
-export const unlockHint = (u: Unlockable) => u.ach ? 'conquista' : `nv ${u.lvl}`;
 
 /* ---------- Companheiros de viagem ---------- */
-export interface Companion extends Unlockable { id: string; trait: string; say: { idle: string; busy: string; goal: string } }
+export interface Companion extends Unlockable { id: string; e: string; trait: string; say: { idle: string; busy: string; goal: string } }
 export const COMPANIONS: Companion[] = [
   { id: 'turbo', e: '🐌', name: 'Turbo', lvl: 1, trait: 'A lesma-mascote: devagar na aparência, turbo na entrega.',
     say: { idle: 'Bora acelerar? Ainda não saímos hoje!', busy: 'Turbo ligado! Vamos nessa.', goal: 'Meta batida! Merecemos uma folga.' } },

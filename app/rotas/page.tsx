@@ -106,7 +106,7 @@ export default function Rotas() {
 
   const map = (
     <MapView route={cur} stops={mine} me={app.me} picking={!!app.picking} follow={follow}
-      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} avatar={cfg.avatar} accessory={cfg.accessory} buddy={companionOf(cfg.companion).e} bottomPad={isRun ? sheetH : 0}
+      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} look={cfg.look} buddy={companionOf(cfg.companion).e} bottomPad={isRun ? sheetH : 0}
       learn={learn} near={isRun ? info.near : null} onRemoveHazard={id => void removeHazard(id)} onRemoveFav={id => void removeFav(id)} />
   );
   const locateBtn = (

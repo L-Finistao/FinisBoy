@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSync } from '../../lib/client/use-sync';
 import { saveCfg, useGame } from '../../lib/client/game';
-import { ACH_XP, BOND_NAMES, CHALLENGE_XP, GOAL_XP, THEMES, bondInfo, companionOf, titleOf } from '../../lib/core/game';
+import { ACH_XP, BOND_NAMES, CHALLENGE_XP, GOAL_XP, THEMES, bondInfo, companionOf, titleOf, unlockedBetween } from '../../lib/core/game';
 
 type Party = { id: string; icon: string; kicker: string; title: string; text: string };
 
@@ -60,7 +60,7 @@ export default function GameLayer() {
     if (!cfg.seen) patch.seen = { level: game.level, ach: game.unlockedIds };      // primeira vez: não comemora o que já existia
     else {
       const newAch = game.ach.filter(a => a.unlocked && !cfg.seen!.ach.includes(a.id));
-      if (game.level > cfg.seen.level) party.push({ id: 'lv' + game.level, icon: '⭐', kicker: `Nível ${game.level}`, title: `Você agora é ${titleOf(game.level)}`, text: 'Veja o que foi desbloqueado em Perfil: novos avatares, acessórios, molduras e companheiros.' });
+      if (game.level > cfg.seen.level) party.push({ id: 'lv' + game.level, icon: '⭐', kicker: `Nível ${game.level}`, title: `Você agora é ${titleOf(game.level)}`, text: (() => { const n = unlockedBetween(cfg.seen!.level, game.level); return n.length ? `Desbloqueou: ${n.join(', ')}. Veja em Perfil.` : 'Veja o que há de novo em Perfil.'; })() });
       for (const a of newAch) party.push({ id: 'ac' + a.id, icon: a.icon, kicker: 'Conquista desbloqueada', title: a.name, text: `${a.desc} · +${ACH_XP} XP` });
       if (game.level !== cfg.seen.level || newAch.length) patch.seen = { level: Math.max(game.level, cfg.seen.level), ach: [...new Set([...cfg.seen.ach, ...game.unlockedIds])] };
     }

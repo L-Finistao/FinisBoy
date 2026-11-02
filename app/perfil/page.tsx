@@ -5,9 +5,10 @@ import { saveCfg, useGame } from '../../lib/client/game';
 import { Shell } from '../_components/Shell';
 import { Icon } from '../_components/Icon';
 import { Character, GoalRings, XpBar } from '../_components/Game';
+import { BAGS, GLASSES, HAIRS, HAIR_COLORS, HELMETS, OUTFITS, SKINS, VEHICLES, VEHICLE_COLORS, type Look, type Item, type Swatch } from '../../lib/core/rider';
 import { fmtClock, money } from '../../lib/core/format';
 import { fmtKm, parseMoney } from '../../lib/core/earnings';
-import { ACCESSORIES, AVATARS, BOND_NAMES, COMPANIONS, FRAMES, THEMES, bondInfo, companionOf, companionSay, isUnlocked, unlockHint, type Goals } from '../../lib/core/game';
+import { BOND_NAMES, COMPANIONS, FRAMES, THEMES, bondInfo, companionOf, companionSay, isUnlocked, unlockHint, type Goals } from '../../lib/core/game';
 
 const num = (v: string) => Math.max(0, Math.round(parseMoney(v)));
 
@@ -25,6 +26,20 @@ export default function Perfil() {
     { k: 'weekDeliveries', l: 'Entregas por semana', ph: '50' }, { k: 'weekGain', l: 'Ganho por semana (R$)', ph: '800' },
   ];
   const ch = game.challenge;
+  const setLook = (patch: Partial<Look>) => void saveCfg({ look: { ...cfg.look, ...patch } });
+  const opts = (title: string, items: (Item | Swatch)[], field: keyof Look) => (
+    <>
+      <div className="eyebrow">{title}</div>
+      <div className="pick">
+        {items.map(it => {
+          const lock = !isUnlocked(it, game.level, game.unlockedIds), sw = 'color' in it, on = cfg.look[field] === it.id;
+          return <button key={it.id || 'nenhum'} className={`${sw ? 'dot' : 'tx'} ${on ? 'sel' : ''} ${lock ? 'lock' : ''}`} disabled={lock} title={it.name} aria-label={it.name}
+            style={sw ? { background: (it as Swatch).color } : undefined} onClick={() => setLook({ [field]: it.id } as Partial<Look>)}>
+            {lock ? <Icon n="lock" /> : sw ? '' : it.name}{lock && <small>{unlockHint(it)}</small>}</button>;
+        })}
+      </div>
+    </>
+  );
 
   return (
     <Shell>
@@ -89,22 +104,17 @@ export default function Perfil() {
 
       <div className="sechead"><h2>Personalizar<span className="sub">Desbloqueie subindo de nível</span></h2></div>
       <section className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="eyebrow">Avatar (aparece no mapa)</div>
-        <div className="pick">
-          {AVATARS.map(a => {
-            const lock = game.level < a.lvl;
-            return <button key={a.e} className={`${cfg.avatar === a.e ? 'sel' : ''} ${lock ? 'lock' : ''}`} disabled={lock} onClick={() => void saveCfg({ avatar: a.e })} aria-label={`Avatar ${a.e}`}>
-              {lock ? <Icon n="lock" /> : a.e}{lock && <small>nv {a.lvl}</small>}</button>;
-          })}
-        </div>
-        <div className="eyebrow">Acessório</div>
-        <div className="pick">
-          {ACCESSORIES.map(a => {
-            const lock = !isUnlocked(a, game.level, game.unlockedIds);
-            return <button key={a.name} className={`${cfg.accessory === a.e ? 'sel' : ''} ${lock ? 'lock' : ''}`} disabled={lock} onClick={() => void saveCfg({ accessory: a.e })} aria-label={a.name} title={a.name}>
-              {lock ? <Icon n="lock" /> : a.e || '∅'}{lock && <small>{unlockHint(a)}</small>}</button>;
-          })}
-        </div>
+        <div className="preview" style={{ justifyContent: 'center' }}><Character cfg={cfg} size={96} buddy /></div>
+        <p className="muted">Seu boneco, com equipamentos e veículo, aparece no mapa. Itens novos abrem ao subir de nível e ao ganhar conquistas.</p>
+        {opts('Veículo', VEHICLES, 'vehicle')}
+        {opts('Cor do veículo', VEHICLE_COLORS, 'vcolor')}
+        {opts('Capacete', HELMETS, 'helmet')}
+        {opts('Óculos', GLASSES, 'glasses')}
+        {opts('Bolsa de entrega', BAGS, 'bag')}
+        {opts('Roupa', OUTFITS, 'outfit')}
+        {opts('Pele', SKINS, 'skin')}
+        {opts('Cabelo', HAIRS, 'hair')}
+        {opts('Cor do cabelo', HAIR_COLORS, 'hairColor')}
         <div className="eyebrow">Moldura</div>
         <div className="pick">
           {FRAMES.map(f => {

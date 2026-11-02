@@ -1,4 +1,5 @@
 'use client';
+import { riderSvg, type Look } from '../../lib/core/rider';
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -8,13 +9,13 @@ import type { LatLon, Route, Stop } from '../../lib/core/types';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const pin = (text: string | number, cls = '') => L.divIcon({ className: '', html: `<div class="pin ${cls}">${text}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
-const meIcon = (e: string, acc = '', buddy = '') => L.divIcon({ className: '', html: `<div class="me">${e}${acc ? `<i class="acc">${acc}</i>` : ''}${buddy ? `<i class="bud">${buddy}</i>` : ''}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+const meIcon = (look: Partial<Look> | undefined, buddy = '') => L.divIcon({ className: '', html: `<div class="me rider">${riderSvg(look, 46)}${buddy ? `<i class="bud">${buddy}</i>` : ''}</div>`, iconSize: [60, 46], iconAnchor: [30, 40] });
 const hzIcon = (e: string) => L.divIcon({ className: '', html: `<div class="hz">${e}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
 
 interface Props {
   route: Route | null; stops: Stop[]; me: LatLon | null; picking: boolean;
   follow: boolean; onPick: (lat: number, lon: number) => void; onDrag: () => void; centerSignal: number;
-  bottomPad?: number; avatar?: string; accessory?: string; buddy?: string;                   // altura coberta pela folha inferior (mapa em tela cheia)
+  bottomPad?: number; look?: Partial<Look>; buddy?: string;                   // altura coberta pela folha inferior (mapa em tela cheia)
   learn?: Learn; near?: Near | null;                     // aprendizado (problemas, favoritas, trechos lentos) e posição na rota
   onRemoveHazard?: (id: string) => void; onRemoveFav?: (id: string) => void;
 }
@@ -29,7 +30,7 @@ function popupWithButton(html: string, label: string, onClick: () => void) {
   return box;
 }
 
-export default function MapView({ route, stops, me, picking, follow, onPick, onDrag, centerSignal, bottomPad = 0, avatar = '🏍️', accessory = '', buddy = '', learn, near, onRemoveHazard, onRemoveFav }: Props) {
+export default function MapView({ route, stops, me, picking, follow, onPick, onDrag, centerSignal, bottomPad = 0, look, buddy = '', learn, near, onRemoveHazard, onRemoveFav }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -123,12 +124,12 @@ export default function MapView({ route, stops, me, picking, follow, onPick, onD
   useEffect(() => {
     const m = map.current;
     if (!m || !me) return;
-    if (!meMk.current) { meMk.current = L.marker([me.lat, me.lon], { icon: meIcon(avatar, accessory, buddy), zIndexOffset: 1000 }).addTo(m); if (!route) m.setView([me.lat, me.lon], 13); }
+    if (!meMk.current) { meMk.current = L.marker([me.lat, me.lon], { icon: meIcon(look, buddy), zIndexOffset: 1000 }).addTo(m); if (!route) m.setView([me.lat, me.lon], 13); }
     else meMk.current.setLatLng([me.lat, me.lon]);
     if (follow && route?.status === 'andamento') m.panTo([me.lat, me.lon]);
   }, [me, follow, route]);
 
-  useEffect(() => { meMk.current?.setIcon(meIcon(avatar, accessory, buddy)); }, [avatar, accessory, buddy]);
+  useEffect(() => { meMk.current?.setIcon(meIcon(look, buddy)); }, [JSON.stringify(look), buddy]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (centerSignal && me) map.current?.setView([me.lat, me.lon], 15); }, [centerSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const c = map.current?.getContainer(); if (c) c.style.cursor = picking ? 'crosshair' : ''; }, [picking]);
 

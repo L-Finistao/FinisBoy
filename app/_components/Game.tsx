@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { Icon } from './Icon';
+import { riderSvg } from '../../lib/core/rider';
 import { money } from '../../lib/core/format';
 import { FRAMES, companionOf, companionSay, type Game, type GameCfg } from '../../lib/core/game';
 
@@ -17,13 +18,13 @@ export function Ring({ pct, size = 64, children }: { pct: number; size?: number;
   );
 }
 
-// Personagem montado em camadas: avatar + moldura + acessório (+ companheiro ao lado).
-export function Character({ cfg, size = 52, buddy = false }: { cfg: Pick<GameCfg, 'avatar' | 'accessory' | 'frame' | 'companion'>; size?: number; buddy?: boolean }) {
-  const fr = FRAMES.find(f => f.id === cfg.frame), comp = companionOf(cfg.companion);
+// Boneco do motoboy (corpo, equipamentos e veículo) em moldura, com o companheiro ao lado.
+export function Character({ cfg, size = 52, buddy = false }: { cfg: Pick<GameCfg, 'look' | 'frame' | 'companion'>; size?: number; buddy?: boolean }) {
+  const fr = FRAMES.find(f => f.id === cfg.frame), comp = companionOf(cfg.companion), w = Math.round(size * 1.5);
   return (
-    <span className="char" style={{ width: size, height: size, fontSize: size * 0.55 }}>
-      <span className={`avatar ${fr?.color ? 'framed' : ''}`} style={{ width: size, height: size, fontSize: 'inherit', ...(fr?.color ? { borderColor: fr.color, boxShadow: `0 0 0 2px #fff, 0 0 10px ${fr.color}` } : {}) }}>{cfg.avatar}</span>
-      {cfg.accessory && <i className="acc" style={{ fontSize: size * 0.4 }}>{cfg.accessory}</i>}
+    <span className="char" style={{ width: w, height: size }}>
+      <span className="avatar rider" style={{ width: w, height: size, ...(fr?.color ? { borderColor: fr.color, boxShadow: `0 0 0 2px var(--card), 0 0 10px ${fr.color}` } : {}) }}
+        dangerouslySetInnerHTML={{ __html: riderSvg(cfg.look, size * 0.86) }} />
       {buddy && <i className="bud" style={{ fontSize: size * 0.42 }}>{comp.e}</i>}
     </span>
   );
