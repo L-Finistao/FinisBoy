@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import './globals.css';
 import SwRegister from './SwRegister';
+import GameLayer from './_components/GameLayer';
 
 export const metadata = {
   title: 'FinisBoy',
@@ -12,7 +13,7 @@ export const viewport = { width: 'device-width', initialScale: 1, viewportFit: '
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}<SwRegister /></body>
+      <body>{children}<SwRegister /><GameLayer /></body>
     </html>
   );
 }

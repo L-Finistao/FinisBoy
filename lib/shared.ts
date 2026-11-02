@@ -3,7 +3,7 @@ export const SYNC_STORES = ['stops', 'deliveries', 'expenses', 'routes', 'tracks
 export type SyncStore = (typeof SYNC_STORES)[number];
 
 // Configurações (kv) que vão para a conta. O pacote offline e o cache de endereços ficam só no aparelho.
-export const SYNC_KV = ['profiles', 'lastProfile', 'pay', 'target', 'city', 'learnOn', 'keepOn', 'voice', 'avatar', 'hazards', 'devzones', 'speedmap'] as const;
+export const SYNC_KV = ['profiles', 'lastProfile', 'pay', 'target', 'city', 'learnOn', 'keepOn', 'voice', 'avatar', 'hazards', 'devzones', 'speedmap', 'game'] as const;
 
 export const BACKUP_OPTIONS = [5, 10, 15, 60, 120] as const;
 export type BackupMinutes = (typeof BACKUP_OPTIONS)[number];

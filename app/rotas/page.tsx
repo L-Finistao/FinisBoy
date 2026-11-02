@@ -7,6 +7,8 @@ import { useRequireUser } from '../../lib/client/use-sync';
 import * as A from '../../lib/client/store';
 import { Shell } from '../_components/Shell';
 import { Icon } from '../_components/Icon';
+import { GameCard } from '../_components/Game';
+import { useGame } from '../../lib/client/game';
 import { fmtClock, fmtDist, fmtDur, money } from '../../lib/core/format';
 import { costPerKm, todayGross, type Profile } from '../../lib/core/earnings';
 import type { Stop } from '../../lib/core/types';
@@ -27,6 +29,7 @@ function meta(s: Stop) {
 export default function Rotas() {
   const sync = useRequireUser();
   const app = useApp();
+  const { cfg, game } = useGame();
   const [adding, setAdding] = useState(false);
   const [follow, setFollow] = useState(true);
   const [center, setCenter] = useState(0);
@@ -84,7 +87,7 @@ export default function Rotas() {
 
   const map = (
     <MapView route={cur} stops={mine} me={app.me} picking={!!app.picking} follow={follow}
-      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} bottomPad={isRun ? sheetH : 0} />
+      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} avatar={cfg.avatar} bottomPad={isRun ? sheetH : 0} />
   );
   const locateBtn = (
     <button className="icon-btn locate" aria-label="Centralizar em mim" onClick={() => { setFollow(true); setCenter(c => c + 1); void A.getPosition(); }}><Icon n="locate" /></button>
@@ -116,6 +119,15 @@ export default function Rotas() {
               <div className="muted" style={{ marginTop: 4 }}>{nDone} de {nAll} entregas · {money(gain)}</div>
             </div>
           </div>
+          {game && (
+            <div className="gmini" style={{ marginTop: 8 }}>
+              <span className="avatar" style={{ width: 30, height: 30, fontSize: '1rem', borderWidth: 2 }}>{cfg.avatar}</span>
+              <span className="muted">Nv {game.level}</span>
+              <div className="xpbar"><i style={{ width: `${game.pct * 100}%` }} /></div>
+              {cfg.goals.dayDeliveries > 0 && <span className="muted">🎯 {game.stats.today.n}/{cfg.goals.dayDeliveries}</span>}
+              <span className="streak"><Icon n="flame" />{game.stats.curStreak}</span>
+            </div>
+          )}
           {next ? (
             <div className="next-in">
               <div className="rowb"><span className="rowb" style={{ justifyContent: 'flex-start' }}><span className="num">{pend.indexOf(next) + 1}</span><span className="eyebrow">Próxima parada</span></span>
@@ -172,6 +184,7 @@ export default function Rotas() {
   /* ---------- Planejamento ---------- */
   return (
     <Shell running={!!running} action={<button className="dark" onClick={() => setAdding(true)}><Icon n="plus" />Nova rota</button>}>
+      {game && <GameCard game={game} cfg={cfg} name={sync.user.name || 'Piloto'} />}
       <div className="mapcard">
         {map}
         {app.me && <span className="chip l"><i className="dot" />GPS ativo</span>}

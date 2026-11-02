@@ -6,15 +6,15 @@ import type { LatLon, Route, Stop } from '../../lib/core/types';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const pin = (text: string | number, cls = '') => L.divIcon({ className: '', html: `<div class="pin ${cls}">${text}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
-const meIcon = L.divIcon({ className: '', html: '<div class="me">🏍</div>', iconSize: [34, 34], iconAnchor: [17, 17] });
+const meIcon = (e: string) => L.divIcon({ className: '', html: `<div class="me">${e}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
 
 interface Props {
   route: Route | null; stops: Stop[]; me: LatLon | null; picking: boolean;
   follow: boolean; onPick: (lat: number, lon: number) => void; onDrag: () => void; centerSignal: number;
-  bottomPad?: number;                    // altura coberta pela folha inferior (mapa em tela cheia)
+  bottomPad?: number; avatar?: string;                   // altura coberta pela folha inferior (mapa em tela cheia)
 }
 
-export default function MapView({ route, stops, me, picking, follow, onPick, onDrag, centerSignal, bottomPad = 0 }: Props) {
+export default function MapView({ route, stops, me, picking, follow, onPick, onDrag, centerSignal, bottomPad = 0, avatar = '🏍️' }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -70,11 +70,12 @@ export default function MapView({ route, stops, me, picking, follow, onPick, onD
   useEffect(() => {
     const m = map.current;
     if (!m || !me) return;
-    if (!meMk.current) { meMk.current = L.marker([me.lat, me.lon], { icon: meIcon, zIndexOffset: 1000 }).addTo(m); if (!route) m.setView([me.lat, me.lon], 13); }
+    if (!meMk.current) { meMk.current = L.marker([me.lat, me.lon], { icon: meIcon(avatar), zIndexOffset: 1000 }).addTo(m); if (!route) m.setView([me.lat, me.lon], 13); }
     else meMk.current.setLatLng([me.lat, me.lon]);
     if (follow && route?.status === 'andamento') m.panTo([me.lat, me.lon]);
   }, [me, follow, route]);
 
+  useEffect(() => { meMk.current?.setIcon(meIcon(avatar)); }, [avatar]);
   useEffect(() => { if (centerSignal && me) map.current?.setView([me.lat, me.lon], 15); }, [centerSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const c = map.current?.getContainer(); if (c) c.style.cursor = picking ? 'crosshair' : ''; }, [picking]);
 

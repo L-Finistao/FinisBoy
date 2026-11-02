@@ -9,6 +9,7 @@ const TABS = [
   { href: '/rotas', label: 'Rotas', icon: 'nav' },
   { href: '/dia', label: 'Dia', icon: 'calendar' },
   { href: '/historico', label: 'Histórico', icon: 'history' },
+  { href: '/perfil', label: 'Perfil', icon: 'trophy' },
 ] as const;
 
 function ago(t: number, now: number) {
