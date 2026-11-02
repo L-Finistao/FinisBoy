@@ -26,3 +26,8 @@ create table if not exists docs (
   primary key (user_id, store, doc_id)
 );
 create index if not exists docs_user_seq on docs (user_id, seq);
+
+-- Intervalo do backup automático (minutos), por usuário. Rode também em bancos já existentes.
+alter table users add column if not exists backup_minutes integer not null default 60;
+alter table users drop constraint if exists users_backup_minutes_chk;
+alter table users add constraint users_backup_minutes_chk check (backup_minutes in (5, 10, 15, 60, 120));
