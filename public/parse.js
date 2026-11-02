@@ -236,11 +236,13 @@ async function geocodeOnline(s, f) {
   }
 
   // Photon: busca aproximada (aceita nomes parecidos)
+  // Só quando o ViaCEP não confirmou a rua: se confirmou, o Photon acharia outra rua parecida (Waldemar Vicente -> Waldemar Lot)
+  // e o ponto certo vem do CEP, logo abaixo.
   const pq = [street, f.city].filter(Boolean).join(', ');
-  const ph = await getJSON(`https://photon.komoot.io/api/?limit=5&q=${encodeURIComponent(pq)}${me ? `&lat=${me.lat}&lon=${me.lon}` : ''}`, 'photon', 400);
+  const ph = canon ? null : await getJSON(`https://photon.komoot.io/api/?limit=5&q=${encodeURIComponent(pq)}${me ? `&lat=${me.lat}&lon=${me.lon}` : ''}`, 'photon', 400);
   const feats = ((ph && ph.features) || []).filter(x => (x.properties.countrycode || 'BR') === 'BR');
   const fc = feats.find(x => !f.city || norm(x.properties.city || x.properties.county || '').includes(norm(f.city))) || null;
-  if (fc && similarity(stripType(street), stripType(fc.properties.name || '')) >= 0.6) {
+  if (fc && similarity(stripType(street), stripType(fc.properties.name || '')) >= 0.8) {
     const [lo, la] = fc.geometry.coordinates;
     return mk(la, lo, `${fc.properties.name}, ${fc.properties.city || ''}`, 'street');
   }
@@ -259,7 +261,7 @@ async function geocodeOnline(s, f) {
 
 async function geocode(s) {
   const f = addrFields(s);
-  const key = 'g|' + stripType(f.street) + '|' + (f.num ?? '') + '|' + norm(f.bairro) + '|' + norm(f.city) + '|' + validCep(s.cep);
+  const key = 'g2|' + stripType(f.street) + '|' + (f.num ?? '') + '|' + norm(f.bairro) + '|' + norm(f.city) + '|' + validCep(s.cep);
   if (geoCache[key]) return geoCache[key];
 
   let netErr = null, res = null;
