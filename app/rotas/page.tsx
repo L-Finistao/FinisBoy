@@ -1,13 +1,14 @@
 'use client';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useApp } from '../../lib/client/use-app';
 import { useRequireUser } from '../../lib/client/use-sync';
 import * as A from '../../lib/client/store';
 import { Shell } from '../_components/Shell';
 import { Icon } from '../_components/Icon';
 import { Character, GameCard } from '../_components/Game';
+import { ScanOrder, TicketChips } from './ScanOrder';
 import { companionOf } from '../../lib/core/game';
 import { useGame } from '../../lib/client/game';
 import { useLive, addHazard, removeHazard, removeFav } from '../../lib/client/live';
@@ -93,6 +94,16 @@ export default function Rotas() {
     void A.addFromText(String(f.get('txt') || ''), pid || undefined);
   }
 
+  // Comanda lida por foto e confirmada: entra como uma parada com os dados do pedido.
+  async function scanAdd(text: string, extra: { ticket: Stop['ticket']; note?: string; sender?: string }, form: HTMLFormElement | null) {
+    const f = form ? new FormData(form) : null;
+    if (f) await A.setCity(String(f.get('city') || '').trim());
+    setAdding(false);
+    const pid = String(f?.get('profile') || '');
+    if (pid) await A.setLastProfile(pid);
+    void A.addFromText(text, pid || undefined, extra);
+  }
+
   // Cronômetro da entrega atual: verde, amarelo (80% da meta) e vermelho (estourou)
   const leg = running ? (now - (running.legStartedAt || now)) / 1000 : 0, lim = app.target * 60;
   const st = !lim ? 'ok' : leg > lim ? 'late' : leg > lim * 0.8 ? 'warn' : 'ok';
@@ -160,6 +171,7 @@ export default function Rotas() {
                 {next.legDur != null && <b className="ok">{hhmm(now + next.legDur * 1000)}</b>}</div>
               <div className="addr">{next.raw}</div>
               <div className="muted">{[next.legDist != null && `em ${fmtDist(next.legDist)}`, next.note, next.sender && '📞 ' + next.sender].filter(Boolean).join(' · ')}</div>
+              <TicketChips t={next.ticket} />
               <div className="btns">
                 <a className="btn" target="_blank" rel="noopener" href={`https://www.google.com/maps/dir/?api=1&destination=${next.lat},${next.lon}&travelmode=two-wheeler`}><Icon n="nav" />Navegar</a>
                 <button className="primary" onClick={() => void A.markDone(next.id, true)}><Icon n="check" />Marcar entrega</button>
@@ -204,7 +216,7 @@ export default function Rotas() {
           )}
         </section>
 
-        {adding && <AddSheet app={app} target={target} onClose={() => setAdding(false)} onSubmit={submitAdd} />}
+        {adding && <AddSheet app={app} target={target} onClose={() => setAdding(false)} onSubmit={submitAdd} onScan={scanAdd} />}
         {hz && (
           <div className="overlay" onClick={() => setHz(false)}>
             <div className="sheet" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -283,6 +295,7 @@ export default function Rotas() {
                     <div className="txt">
                       <div className="a">{s.raw}</div>
                       <div className={`m ${m.bad ? 'f' : ''}`}>{[s.note, m.t].filter(Boolean).join(' · ')}</div>
+                      <TicketChips t={s.ticket} />
                     </div>
                     <div className="t">{s.done && s.doneAt ? hhmm(s.doneAt) : ''}</div>
                   </div>
@@ -305,15 +318,16 @@ export default function Rotas() {
         <button className="ghost full" onClick={() => { if (confirm('Apagar as rotas pendentes?')) void A.clearPending(); }}>Limpar rotas pendentes</button>
       )}
 
-      {adding && <AddSheet app={app} target={target} onClose={() => setAdding(false)} onSubmit={submitAdd} />}
+      {adding && <AddSheet app={app} target={target} onClose={() => setAdding(false)} onSubmit={submitAdd} onScan={scanAdd} />}
     </Shell>
   );
 }
 
-function AddSheet({ app, target, onClose, onSubmit }: { app: ReturnType<typeof useApp>; target: ReturnType<typeof A.addTarget>; onClose: () => void; onSubmit: (e: FormEvent<HTMLFormElement>) => void }) {
+function AddSheet({ app, target, onClose, onSubmit, onScan }: { app: ReturnType<typeof useApp>; target: ReturnType<typeof A.addTarget>; onClose: () => void; onSubmit: (e: FormEvent<HTMLFormElement>) => void; onScan: (text: string, extra: { ticket: Stop['ticket']; note?: string; sender?: string }, form: HTMLFormElement | null) => void }) {
+  const form = useRef<HTMLFormElement>(null);
   return (
     <div className="overlay" onClick={onClose}>
-      <form className="sheet" onClick={e => e.stopPropagation()} onSubmit={onSubmit} style={{ gap: 10 }}>
+      <form ref={form} className="sheet" onClick={e => e.stopPropagation()} onSubmit={onSubmit} style={{ gap: 10 }}>
         <h2>{target ? 'Adicionar endereços' : 'Nova rota'}</h2>
         <p className="muted">{target ? `Cole os endereços: eles entram em "${target.name}" e a rota é recalculada.` : 'Cole a mensagem do WhatsApp com os endereços.'}</p>
         {!target && (
@@ -321,6 +335,7 @@ function AddSheet({ app, target, onClose, onSubmit }: { app: ReturnType<typeof u
             <select name="profile" defaultValue={A.defaultProfileId()}>{app.profiles.map(p => <option key={p.id} value={p.id}>{profLabel(p)}</option>)}</select>
           </label>
         )}
+        <ScanOrder city={app.city} onAdd={(text, extra) => onScan(text, extra, form.current)} />
         <textarea name="txt" rows={8} autoFocus placeholder={'[29/10, 21:23] +55 18 99764-0397: Rua das Flores, 123 - Centro\n...'} />
         <label>Cidade / UF padrão<input name="city" defaultValue={app.city} placeholder="Ex.: Birigui - SP" autoComplete="off" /></label>
         <div className="row">

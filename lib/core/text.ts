@@ -94,7 +94,7 @@ export function parseText(text: string): ParsedAddress[] {
 
 // "Rua Piauí, 218, Centro" -> { street, num, rest }
 export function splitAddr(raw: string) {
-  const t = raw.replace(/\bN[º°]\.?\s*/gi, '').replace(COMPL, ' ').replace(/\s+-\s+/g, ', ');
+  const t = raw.replace(/\b(?:N[º°]|Nr|Nro)\.?\s*/gi, '').replace(COMPL, ' ').replace(/\s+-\s+/g, ', ');
   const parts = t.split(',').map(x => x.trim()).filter(Boolean);
   let street = parts[0] || '', num: number | null = null;
   const rest: string[] = [];

@@ -48,12 +48,23 @@ async function app(req) {
   }
 }
 
+// Arquivos do leitor de comanda (OCR, ~9 MB): não mudam, então usa a cópia do aparelho e só busca na rede na primeira vez.
+async function asset(req) {
+  const cache = await caches.open(PAGES);
+  const hit = await cache.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (res.ok) cache.put(req, res.clone());
+  return res;
+}
+
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.pathname.startsWith('/api/')) return;                       // contas e sincronização: sempre direto na rede, nunca em cache
   if (url.hostname === 'tile.openstreetmap.org') e.respondWith(tile(req));
+  else if (url.origin === location.origin && url.pathname.startsWith('/ocr/')) e.respondWith(asset(req));
   else if (url.origin === location.origin) e.respondWith(app(req));
   // ViaCEP, Nominatim e OSRM passam direto: o app trata a falta de internet.
 });

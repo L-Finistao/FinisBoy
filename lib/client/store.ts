@@ -206,7 +206,7 @@ export const addTarget = () => { const c = currentRoute(); return c && c.status 
 
 const topOf = (xs: string[]) => xs.sort((a, b) => xs.filter(x => x === b).length - xs.filter(x => x === a).length)[0];
 
-export async function addFromText(text: string, profileId?: string) {
+export async function addFromText(text: string, profileId?: string, extra?: { ticket?: Stop['ticket']; note?: string; sender?: string }) {
   const addrs = parseText(text);
   if (!addrs.length) { setStatus('Nenhum endereço encontrado no texto.', 4000); return; }
   // Alguns endereços vêm sem a UF ("Birigui" em vez de "Birigui - SP"): completa com a UF mais comum da lista.
@@ -232,8 +232,9 @@ export async function addFromText(text: string, profileId?: string) {
   const base = routeStops(r.id).length;
   for (const [i, a] of addrs.entries()) {
     await saveStop({
-      id: newId(), routeId: r.id, raw: a.raw, note: a.note, cep: a.cep, cityGuess: a.cityGuess,
-      sender: a.sender, when: a.when, addedAt: Date.now(), lat: null, lon: null, done: false, order: 1000 + base + i,
+      id: newId(), routeId: r.id, raw: a.raw, note: [a.note, extra?.note].filter(Boolean).join(' · '), cep: a.cep, cityGuess: a.cityGuess,
+      ...(extra?.ticket ? { ticket: extra.ticket } : {}),
+      sender: a.sender || extra?.sender || null, when: a.when, addedAt: Date.now(), lat: null, lon: null, done: false, order: 1000 + base + i,
     });
   }
   set({ curId: r.id });

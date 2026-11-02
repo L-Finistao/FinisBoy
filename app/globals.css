@@ -227,6 +227,9 @@ details.hrow summary::-webkit-details-marker { display: none; }
 .comp .ic { font-size: 2rem; line-height: 1.1; } .comp.sel { border: 2px solid var(--brand); background: var(--brand-soft); } .comp.lock { opacity: .45; } .comp.lock .ic { filter: grayscale(1); }
 .hearts { letter-spacing: 1px; color: #e11d48; font-size: .8rem; }
 .preview { display: flex; align-items: center; gap: 16px; background: var(--brand-soft); border-radius: var(--r-s); padding: 14px; }
+.scan { display: flex; flex-direction: column; gap: 8px; } .scanbox { display: flex; flex-direction: column; gap: 8px; background: var(--brand-soft); border-radius: var(--r-s); padding: 10px; }
+.tks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; } .tks:empty { display: none; }
+.tk { font-size: .72rem; font-weight: 700; border-radius: 8px; padding: 3px 8px; background: var(--bg); } .tk.drink { background: #e0f4fd; color: #0a5a7a; } .tk.good { background: var(--ok-soft); color: var(--ok); } .tk.bad { background: var(--bad-soft); color: var(--bad); }
 .gmini { display: flex; align-items: center; gap: 10px; } .gmini .xpbar { flex: 1; }
 
 /* Corrida: ações em 5 colunas e marcadores de problema */

@@ -116,8 +116,14 @@ async function resolveStreet(f: Fields, userCep: string | null) {
 type NomResult = { lat: string; lon: string; display_name: string; address?: Record<string, string> };
 const hasHouse = (r: NomResult) => !!(r.address && r.address.house_number);
 
-function pickResult(list: NomResult[], bairros: string[], cityTxt: string, me: LatLon | null) {
-  let l = list;
+const roadOf = (r: NomResult) => (r.address && (r.address.road || r.address.pedestrian || r.address.residential || r.address.footway || r.address.path)) || '';
+// A rua devolvida precisa parecer com a pedida: o Nominatim aceita responder com "algo perto" (ex.: Rua das Palmeiras -> Rua São João).
+const SAME_STREET = 0.5;
+const sameStreet = (street: string, r: NomResult) => { const road = roadOf(r); return !road || similarity(stripType(street), stripType(road)) >= SAME_STREET; };
+
+function pickResult(list: NomResult[], bairros: string[], cityTxt: string, me: LatLon | null, street: string) {
+  let l = list.filter(r => sameStreet(street, r));
+  if (!l.length) return null;
   if (cityTxt) {
     const f = l.filter(r => norm(r.display_name).includes(norm(cityTxt)));
     if (f.length) l = f;
@@ -151,11 +157,13 @@ async function geocodeOnline(s: Pick<Stop, 'raw' | 'cep' | 'cityGuess'>, f: Fiel
       const b = await getJSON(`https://brasilapi.com.br/api/cep/v2/${cepD}`, 'cep', 150).catch(() => null);
       c = b && b.street ? { logradouro: b.street, bairro: b.neighborhood, localidade: b.city, uf: b.state } : null;
     }
-    if (c && c.logradouro) {
+    // O CEP só vale se a rua dele parece com a rua escrita: CEP digitado errado não pode trocar a rua do pedido.
+    const cepOk = c && c.logradouro && (stripType(f.street).length < 3 || similarity(stripType(f.street), stripType(c.logradouro)) >= SAME_STREET);
+    if (cepOk) {
       const hy = cepD.slice(0, 5) + '-' + cepD.slice(5), cf: Fields = { ...f, street: c.logradouro, city: c.localidade || f.city, uf: c.uf || f.uf, bairro: c.bairro || f.bairro };
       const where = [cf.city, cf.uf].filter(Boolean).join(', ');
       for (const q of [[c.logradouro, f.num, c.bairro, where, hy], [c.logradouro, f.num, where]].map(a => a.filter(Boolean).join(', '))) {
-        const pick = pickResult(await nominatim(q, me), [c.bairro].filter(Boolean), cf.city, me);
+        const pick = pickResult(await nominatim(q, me), [c.bairro].filter(Boolean), cf.city, me, c.logradouro);
         if (pick && hasHouse(pick)) return mk(+pick.lat, +pick.lon, pick.display_name, 'house');
       }
       f = cf;                                                                                 // o resto da busca usa a rua/cidade do CEP
@@ -168,7 +176,7 @@ async function geocodeOnline(s: Pick<Stop, 'raw' | 'cep' | 'cityGuess'>, f: Fiel
 
   // Nominatim: tenta com número; sem resultado, só a rua
   for (const q of new Set([[street, f.num, where].filter(Boolean).join(', '), [street, where].filter(Boolean).join(', ')])) {
-    const pick = pickResult(await nominatim(q, me), bairros, f.city, me);
+    const pick = pickResult(await nominatim(q, me), bairros, f.city, me, street);
     if (pick) {
       const iso = pick.address && pick.address['ISO3166-2-lvl4'];
       if (iso && !ctx.cache._uf) ctx.cache._uf = iso.split('-')[1];
@@ -202,7 +210,7 @@ async function geocodeOnline(s: Pick<Stop, 'raw' | 'cep' | 'cityGuess'>, f: Fiel
 // Devolve o ponto do endereço (ou null se não achou). Lança erro se não há internet para consultar.
 export async function geocode(s: Pick<Stop, 'raw' | 'cep' | 'cityGuess'>, ctx: GeoCtx): Promise<GeoResult | null> {
   const f = addrFields(s, ctx);
-  const key = 'g2|' + stripType(f.street) + '|' + (f.num ?? '') + '|' + norm(f.bairro) + '|' + norm(f.city) + '|' + validCep(s.cep);
+  const key = 'g3|' + stripType(f.street) + '|' + (f.num ?? '') + '|' + norm(f.bairro) + '|' + norm(f.city) + '|' + validCep(s.cep);
   if (ctx.cache[key]) return ctx.cache[key];
   if (!navigator.onLine) throw new Error('offline');
   const res = await geocodeOnline(s, f, ctx);

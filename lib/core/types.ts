@@ -23,6 +23,13 @@ export interface Route {
   geo?: RouteGeo | null;
 }
 
+// Dados da comanda lida por foto (opcionais): bebida, quanto cobrar, pagamento…
+export interface Ticket {
+  no?: string; platform?: string; customer?: string;
+  items: string[]; drinks: string[]; hasDrink: boolean;
+  total?: number; fee?: number; collect?: number; pay?: string; card?: boolean;
+}
+
 export interface Stop {
   id: string; routeId: string;
   raw: string; note: string; cep: string | null; cityGuess: string;
@@ -31,6 +38,7 @@ export interface Stop {
   done: boolean; doneAt?: number; durSec?: number; order: number;
   failed?: boolean; approx?: boolean; src?: string; precision?: Precision;
   legDist?: number | null; legDur?: number | null;
+  ticket?: Ticket;
 }
 
 export interface Delivery { id: string; routeId: string; doneAt: number }
