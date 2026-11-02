@@ -1,4 +1,4 @@
--- FinisBoy: banco no Neon (Postgres). Rode este arquivo uma vez no SQL Editor do Neon.
+-- TurboSlug: banco no Neon (Postgres). Rode este arquivo uma vez no SQL Editor do Neon.
 -- Cada linha de `docs` pertence a um usuário (user_id): a API sempre filtra pelo usuário do login.
 
 create extension if not exists pgcrypto;

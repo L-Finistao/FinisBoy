@@ -1,6 +1,6 @@
 'use strict';
 
-/* Assistente de voz: fala avisos durante a rota e escuta comandos ("Finis, entrega feita").
+/* Assistente de voz: fala avisos durante a rota e escuta comandos ("Turbo, entrega feita").
    Usa o que o navegador já tem (speechSynthesis e SpeechRecognition), sem biblioteca nem servidor nosso.
    Carregado antes de app.js; as globais dele (session, pending, markDone…) só são usadas na hora de executar. */
 
@@ -9,7 +9,7 @@ let voice = { speak: true, listen: true, nav: true };
 let recog = null, recogWant = false, recogFails = 0, recogTimer = null;
 let awakeUntil = 0, confirmEnd = 0, lastSaid = '', speakingUntil = 0;
 const saidAt = {};
-const WAKE = /\b(finis|finish|fines|finisboy|finis boy|assistente)\b/;
+const WAKE = /\b(turbo|turbo slug|turboslug|finis|finish|fines|finisboy|finis boy|assistente)\b/;
 
 const plain = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const spokenAddr = s => String(s.raw || 'endereço sem nome').split(/\s[-–]\s|;|\(/)[0].slice(0, 70);
@@ -118,7 +118,7 @@ function recogStop() {
 // Chamada por applySessionUI: liga a escuta ao iniciar a rota e desliga ao finalizar.
 function voiceSync() {
   const want = !!SR && voice.listen && !!session;
-  if (want && !recogWant) { recogWant = true; recogFails = 0; recogStart(); setStatus('🎙 Escutando. Diga "Finis, entrega feita" ou "Finis, ajuda".', 5000); }
+  if (want && !recogWant) { recogWant = true; recogFails = 0; recogStart(); setStatus('🎙 Escutando. Diga "Turbo, entrega feita" ou "Turbo, ajuda".', 5000); }
   else if (!want && recogWant) recogStop();
 }
 

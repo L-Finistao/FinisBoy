@@ -4,10 +4,10 @@ import { useRequireUser } from '../../lib/client/use-sync';
 import { saveCfg, useGame } from '../../lib/client/game';
 import { Shell } from '../_components/Shell';
 import { Icon } from '../_components/Icon';
-import { GoalRings, XpBar } from '../_components/Game';
+import { Character, GoalRings, XpBar } from '../_components/Game';
 import { fmtClock, money } from '../../lib/core/format';
 import { fmtKm, parseMoney } from '../../lib/core/earnings';
-import { AVATARS, THEMES, type Goals } from '../../lib/core/game';
+import { ACCESSORIES, AVATARS, BOND_NAMES, COMPANIONS, FRAMES, THEMES, bondInfo, companionOf, companionSay, isUnlocked, unlockHint, type Goals } from '../../lib/core/game';
 
 const num = (v: string) => Math.max(0, Math.round(parseMoney(v)));
 
@@ -30,7 +30,7 @@ export default function Perfil() {
     <Shell>
       <section className="panel gcard">
         <div className="rowb" style={{ gap: 14 }}>
-          <span className="avatar big">{cfg.avatar}</span>
+          <Character cfg={cfg} size={76} buddy />
           <div style={{ flex: 1, minWidth: 0 }}>
             <input value={nick ?? cfg.nick} placeholder={sync.user.name || 'Seu apelido'} maxLength={20}
               onChange={e => setNick(e.target.value)} onBlur={() => { if (nick != null) { void saveCfg({ nick: nick.trim() }); setNick(null); } }}
@@ -97,6 +97,23 @@ export default function Perfil() {
               {lock ? <Icon n="lock" /> : a.e}{lock && <small>nv {a.lvl}</small>}</button>;
           })}
         </div>
+        <div className="eyebrow">Acessório</div>
+        <div className="pick">
+          {ACCESSORIES.map(a => {
+            const lock = !isUnlocked(a, game.level, game.unlockedIds);
+            return <button key={a.name} className={`${cfg.accessory === a.e ? 'sel' : ''} ${lock ? 'lock' : ''}`} disabled={lock} onClick={() => void saveCfg({ accessory: a.e })} aria-label={a.name} title={a.name}>
+              {lock ? <Icon n="lock" /> : a.e || '∅'}{lock && <small>{unlockHint(a)}</small>}</button>;
+          })}
+        </div>
+        <div className="eyebrow">Moldura</div>
+        <div className="pick">
+          {FRAMES.map(f => {
+            const lock = !isUnlocked(f, game.level, game.unlockedIds);
+            return <button key={f.id} className={`sw ${cfg.frame === f.id ? 'sel' : ''} ${lock ? 'lock' : ''}`} disabled={lock}
+              style={{ background: f.color || 'var(--brand)', borderColor: cfg.frame === f.id ? 'var(--ink)' : 'transparent' }} onClick={() => void saveCfg({ frame: f.id })}>
+              {lock ? <Icon n="lock" /> : f.name}{lock && <small>{unlockHint(f)}</small>}</button>;
+          })}
+        </div>
         <div className="eyebrow">Tema de cores</div>
         <div className="pick">
           {THEMES.map(t => {
@@ -105,6 +122,38 @@ export default function Perfil() {
               onClick={() => void saveCfg({ theme: t.id })}>{lock ? <Icon n="lock" /> : t.name}{lock && <small>nv {t.lvl}</small>}</button>;
           })}
         </div>
+      </section>
+
+      <div className="sechead"><h2>Companheiro de viagem<span className="sub">Vai com você no mapa</span></h2></div>
+      <section className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {(() => {
+          const c = companionOf(cfg.companion), n = cfg.bonds[c.id] || 0, b = bondInfo(n);
+          return (
+            <div className="preview">
+              <Character cfg={cfg} size={64} buddy />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b>{c.name}</b> <span className="muted">· {BOND_NAMES[b.level - 1]}</span>
+                <div className="hearts">{'♥'.repeat(b.level)}{'♡'.repeat(BOND_NAMES.length - b.level)}</div>
+                <div className="xpbar" style={{ margin: '4px 0' }}><i style={{ width: `${b.pct * 100}%` }} /></div>
+                <div className="muted">{b.max ? `${n} entregas juntos` : `${b.into}/${b.need} entregas para a próxima amizade`}</div>
+                <div style={{ marginTop: 4, fontSize: '.85rem' }}>“{companionSay(c, game)}”</div>
+              </div>
+            </div>
+          );
+        })()}
+        <div className="comp-grid">
+          {COMPANIONS.map(c => {
+            const lock = !isUnlocked(c, game.level, game.unlockedIds), b = bondInfo(cfg.bonds[c.id] || 0);
+            return (
+              <button key={c.id} className={`comp ${cfg.companion === c.id ? 'sel' : ''} ${lock ? 'lock' : ''}`} disabled={lock} onClick={() => void saveCfg({ companion: c.id })} title={c.trait}>
+                <span className="ic">{lock ? '🔒' : c.e}</span><b>{c.name}</b>
+                {lock ? <span className="muted">{c.ach ? `Conquista: ${game.ach.find(a => a.id === c.ach)?.name}` : `Nível ${c.lvl}`}</span>
+                  : <span className="hearts">{'♥'.repeat(b.level)}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <p className="muted">Cada entrega feita com um companheiro aumenta a amizade com ele. Troque quando quiser: o laço de cada um fica guardado.</p>
       </section>
 
       <section className="panel muted">

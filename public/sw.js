@@ -1,7 +1,7 @@
-// FinisBoy (Next.js): rede primeiro, com cópia no aparelho para abrir sem internet.
+// TurboSlug (Next.js): rede primeiro, com cópia no aparelho para abrir sem internet.
 // A versão antiga deste arquivo guardava o app antigo em cache: ao ativar, apaga tudo (menos os blocos do mapa).
-const PAGES = 'finisboy-next-v1';
-const TILES = 'finisboy-tiles';       // blocos do mapa: sobrevivem às atualizações do app
+const PAGES = 'turboslug-next-v1';
+const TILES = 'turboslug-tiles';       // blocos do mapa: sobrevivem às atualizações do app
 const MAX_TILES = 8000;
 
 self.addEventListener('install', () => { self.skipWaiting(); });

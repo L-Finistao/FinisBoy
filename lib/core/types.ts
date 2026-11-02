@@ -1,4 +1,6 @@
 // Registros guardados no aparelho (IndexedDB) e no backup. Mesmos campos do app antigo.
+import type { Step } from './nav';
+
 export type RouteStatus = 'pendente' | 'andamento' | 'finalizada';
 export type Precision = 'house' | 'street' | 'cep' | 'manual';
 export type LatLon = { lat: number; lon: number };
@@ -9,6 +11,8 @@ export interface RouteGeo {
   duration: number;
   approx: boolean;
   baseline: { duration: number; distance: number } | null;
+  steps?: Step[] | null;             // manobras para a voz (curva a curva)
+  learned?: boolean;                 // a rota fugiu de trechos lentos aprendidos
 }
 
 export interface Route {

@@ -36,7 +36,7 @@ export default function Entrar() {
   return (
     <main className="auth"><div className="card">
       <img className="logo" src="/icon-192.png" alt="" />
-      <h1 className="title">{register ? 'Criar conta' : 'Entrar no finisboy'}</h1>
+      <h1 className="title">{register ? 'Criar conta' : 'Entrar no TurboSlug'}</h1>
       <form onSubmit={submit}>
         {register && <label>Nome<input name="name" autoComplete="name" /></label>}
         <label>E-mail<input name="email" type="email" required autoComplete="email" /></label>

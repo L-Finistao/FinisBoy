@@ -99,7 +99,7 @@ function voiceNav(geo, near, speedMs) {
   else if (dist <= far && !navSaid.has('a' + id)) { navSaid.add('a' + id); say(`Em ${metersSpoken(dist)}, ${lowerFirst(s.text)}`, null, true); }
 }
 
-// Fala as próximas manobras de uma vez (botão 🔊 ou "Finis, falar a rota").
+// Fala as próximas manobras de uma vez (botão 🔊 ou "Turbo, falar a rota").
 function voiceRoute() {
   const r = session || cur();
   if (!r || !r.geo || !r.geo.coords) { say('Ainda não há rota calculada.'); return; }

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSync } from '../../lib/client/use-sync';
 import { saveCfg, useGame } from '../../lib/client/game';
-import { ACH_XP, CHALLENGE_XP, GOAL_XP, THEMES, titleOf } from '../../lib/core/game';
+import { ACH_XP, BOND_NAMES, CHALLENGE_XP, GOAL_XP, THEMES, bondInfo, companionOf, titleOf } from '../../lib/core/game';
 
 type Party = { id: string; icon: string; kicker: string; title: string; text: string };
 
@@ -44,10 +44,22 @@ export default function GameLayer() {
       patch.challengeDone = { ...cfg.challengeDone, [game.today]: game.challenge.id };
       party.push({ id: 'ch' + game.today, icon: game.challenge.icon, kicker: 'Desafio do dia concluído', title: game.challenge.name, text: `+${CHALLENGE_XP} XP` });
     }
+    // laço com o companheiro ativo: cada entrega nova conta como estrada compartilhada
+    const total = game.stats.deliveries;
+    if (cfg.bondMark == null) patch.bondMark = total;
+    else if (total !== cfg.bondMark) {
+      patch.bondMark = total;
+      if (total > cfg.bondMark) {
+        const before = cfg.bonds[cfg.companion] || 0, now = before + total - cfg.bondMark, c = companionOf(cfg.companion);
+        patch.bonds = { ...cfg.bonds, [cfg.companion]: now };
+        const lv = bondInfo(now).level;
+        if (lv > bondInfo(before).level) party.push({ id: `bd${c.id}${lv}`, icon: c.e, kicker: 'Amizade subiu de nível', title: `Você e ${c.name} agora são ${BOND_NAMES[lv - 1]}`, text: `${now} entregas juntos` });
+      }
+    }
     if (!cfg.seen) patch.seen = { level: game.level, ach: game.unlockedIds };      // primeira vez: não comemora o que já existia
     else {
       const newAch = game.ach.filter(a => a.unlocked && !cfg.seen!.ach.includes(a.id));
-      if (game.level > cfg.seen.level) party.push({ id: 'lv' + game.level, icon: '⭐', kicker: `Nível ${game.level}`, title: `Você agora é ${titleOf(game.level)}`, text: 'Veja o que foi desbloqueado em Perfil: novos avatares e temas.' });
+      if (game.level > cfg.seen.level) party.push({ id: 'lv' + game.level, icon: '⭐', kicker: `Nível ${game.level}`, title: `Você agora é ${titleOf(game.level)}`, text: 'Veja o que foi desbloqueado em Perfil: novos avatares, acessórios, molduras e companheiros.' });
       for (const a of newAch) party.push({ id: 'ac' + a.id, icon: a.icon, kicker: 'Conquista desbloqueada', title: a.name, text: `${a.desc} · +${ACH_XP} XP` });
       if (game.level !== cfg.seen.level || newAch.length) patch.seen = { level: Math.max(game.level, cfg.seen.level), ach: [...new Set([...cfg.seen.ach, ...game.unlockedIds])] };
     }

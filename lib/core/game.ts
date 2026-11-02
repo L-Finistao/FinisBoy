@@ -8,12 +8,15 @@ import type { Route, Stop } from './types';
 export interface Goals { dayDeliveries: number; dayGain: number; weekDeliveries: number; weekGain: number }
 export interface GameCfg {
   nick: string; avatar: string; theme: string; goals: Goals;
+  accessory: string; frame: string;                   // personagem: acessório (emoji) e moldura
+  companion: string; bonds: Record<string, number>;   // companheiro de viagem ativo e entregas feitas com cada um
+  bondMark?: number;                                  // total de entregas já contado nos laços
   seen?: { level: number; ach: string[] };           // o que já foi comemorado (não repete a festa)
   hitDays: string[];                                  // dias em que a meta diária foi batida (vale 50 XP, gravado na hora)
   challengeDone: Record<string, string>;              // dia -> desafio concluído
 }
 export const DEFAULT_CFG: GameCfg = {
-  nick: '', avatar: '🏍️', theme: 'verde', goals: { dayDeliveries: 10, dayGain: 0, weekDeliveries: 50, weekGain: 0 }, hitDays: [], challengeDone: {},
+  nick: '', avatar: '🏍️', accessory: '', frame: 'verde', companion: 'turbo', bonds: {}, theme: 'verde', goals: { dayDeliveries: 10, dayGain: 0, weekDeliveries: 50, weekGain: 0 }, hitDays: [], challengeDone: {},
 };
 
 /* ---------- Personalização (desbloqueada por nível) ---------- */
@@ -29,6 +32,57 @@ export const THEMES = [
   { id: 'rosa', name: 'Rosa', lvl: 8, brand: '#db2777', b600: '#b81e62', soft: '#fde1ee', ink: '#8a1448' },
   { id: 'dourado', name: 'Dourado', lvl: 12, brand: '#b7791f', b600: '#96610f', soft: '#fbefd3', ink: '#6b450a' },
 ];
+export const ACCESSORIES: Unlockable[] = [
+  { e: '', name: 'Nenhum', lvl: 1 }, { e: '🧢', name: 'Boné', lvl: 2 }, { e: '😎', name: 'Óculos', lvl: 3 }, { e: '⛑️', name: 'Capacete', lvl: 4 },
+  { e: '🎧', name: 'Fone', lvl: 6 }, { e: '🏴‍☠️', name: 'Pirata', lvl: 9 }, { e: '🎩', name: 'Cartola', lvl: 11 }, { e: '🥇', name: 'Medalha', lvl: 1, ach: 'd100' },
+  { e: '🔥', name: 'Chamas', lvl: 1, ach: 's7' }, { e: '⚡', name: 'Raio', lvl: 1, ach: 'fast' }, { e: '👑', name: 'Coroa', lvl: 18 },
+];
+export const FRAMES: (Unlockable & { id: string; color: string })[] = [
+  { id: 'verde', e: '', name: 'Padrão', lvl: 1, color: '' }, { id: 'prata', e: '', name: 'Prata', lvl: 4, color: '#94a3b8' },
+  { id: 'ouro', e: '', name: 'Ouro', lvl: 8, color: '#f5b301' }, { id: 'fogo', e: '', name: 'Fogo', lvl: 1, ach: 's3', color: '#ef4444' },
+  { id: 'neon', e: '', name: 'Neon', lvl: 14, color: '#22d3ee' }, { id: 'diamante', e: '', name: 'Diamante', lvl: 1, ach: 'd500', color: '#a78bfa' },
+];
+export interface Unlockable { e: string; name: string; lvl: number; ach?: string }
+export const isUnlocked = (u: Unlockable, level: number, unlockedAch: string[]) => level >= u.lvl && (!u.ach || unlockedAch.includes(u.ach));
+export const unlockHint = (u: Unlockable) => u.ach ? 'conquista' : `nv ${u.lvl}`;
+
+/* ---------- Companheiros de viagem ---------- */
+export interface Companion extends Unlockable { id: string; trait: string; say: { idle: string; busy: string; goal: string } }
+export const COMPANIONS: Companion[] = [
+  { id: 'turbo', e: '🐌', name: 'Turbo', lvl: 1, trait: 'A lesma-mascote: devagar na aparência, turbo na entrega.',
+    say: { idle: 'Bora acelerar? Ainda não saímos hoje!', busy: 'Turbo ligado! Vamos nessa.', goal: 'Meta batida! Merecemos uma folga.' } },
+  { id: 'dog', e: '🐶', name: 'Caramelo', lvl: 3, trait: 'Leal e animado, sempre na garupa.',
+    say: { idle: 'Au! Cadê as entregas de hoje?', busy: 'Au au! Mais uma entrega!', goal: 'Meta batida! Au au au!' } },
+  { id: 'cat', e: '🐱', name: 'Mia', lvl: 1, ach: 'owl', trait: 'Gata da noite, só conquistada por quem faz entregas de madrugada.',
+    say: { idle: 'Miau… a noite é uma criança.', busy: 'Miau. Estou de olho na rota.', goal: 'Hmm, nada mal. Miau.' } },
+  { id: 'parrot', e: '🦜', name: 'Louro', lvl: 1, ach: 'k100', trait: 'Repete tudo que o GPS fala. Vem com quem roda 100 km.',
+    say: { idle: 'Corre! Corre! Cadê a rota?', busy: 'Vire à direita! Vire à direita!', goal: 'Parabéns! Parabéns!' } },
+  { id: 'racoon', e: '🦝', name: 'Rocky', lvl: 8, trait: 'Esperto: acha atalho até na escuridão.',
+    say: { idle: 'Conheço um atalho… mas e as entregas?', busy: 'Atalho à vista!', goal: 'Meta no bolso!' } },
+  { id: 'hare', e: '🐇', name: 'Relâmpago', lvl: 1, ach: 'fast', trait: 'Só acompanha quem já fez uma entrega em menos de 3 minutos.',
+    say: { idle: 'Estou ficando com preguiça…', busy: 'Mais rápido! Mais rápido!', goal: 'Rápido como o vento!' } },
+  { id: 'robot', e: '🤖', name: 'Byte', lvl: 12, trait: 'Calcula tudo: tempo, km e quanto você ganha.',
+    say: { idle: 'Aguardando entregas. 0 processadas hoje.', busy: 'Processando entrega…', goal: 'Meta atingida. Excelente.' } },
+  { id: 'unicorn', e: '🦄', name: 'Faísca', lvl: 1, ach: 'perf10', trait: 'Raro: aparece para quem faz 10 rotas perfeitas.',
+    say: { idle: 'A magia só funciona com entregas!', busy: 'Brilhando nessa rota!', goal: 'Que dia mágico!' } },
+  { id: 'dragon', e: '🐉', name: 'Draco', lvl: 20, trait: 'Lenda do asfalto. Sopra fogo em quem atrapalha.',
+    say: { idle: 'Até um dragão precisa trabalhar.', busy: 'Rrrroar! Abram caminho!', goal: 'O tesouro do dia é nosso!' } },
+];
+export const companionOf = (id: string) => COMPANIONS.find(c => c.id === id) || COMPANIONS[0];
+
+// Laço de amizade: sobe com as entregas feitas com o companheiro ativo.
+const BOND_STEPS = [0, 10, 30, 75, 150, 300];
+export function bondInfo(n: number) {
+  let lv = 1; while (lv < BOND_STEPS.length && n >= BOND_STEPS[lv]) lv++;
+  const from = BOND_STEPS[lv - 1], to = BOND_STEPS[lv] ?? null;
+  return { level: lv, max: to == null, into: n - from, need: to == null ? 0 : to - from, pct: to == null ? 1 : (n - from) / (to - from) };
+}
+export const BOND_NAMES = ['Conhecidos', 'Parceiros', 'Amigos', 'Inseparáveis', 'Almas gêmeas', 'Lendários'];
+
+export function companionSay(c: Companion, game: { stats: { today: { n: number } }; goalHit: boolean }) {
+  return game.goalHit ? c.say.goal : game.stats.today.n > 0 ? c.say.busy : c.say.idle;
+}
+
 const TITLES: [number, string][] = [[1, 'Novato'], [3, 'Estafeta'], [5, 'Piloto'], [8, 'Veloz'], [12, 'Mestre das ruas'], [16, 'Rei do asfalto'], [20, 'Lenda'], [30, 'Imortal']];
 export const titleOf = (level: number) => [...TITLES].reverse().find(([l]) => level >= l)![1];
 

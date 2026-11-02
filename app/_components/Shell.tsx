@@ -41,7 +41,7 @@ export function Shell({ children, action, running = false }: { children: ReactNo
       <header className="hdr">
         <img className="logo" src="/icon-192.png" alt="" />
         <div className="brand">
-          <b>finisboy</b>
+          <b>TurboSlug</b>
           <small><i className={`dot ${s.online ? '' : 'off'}`} />{s.online ? 'online' : 'offline'}</small>
         </div>
         <Link href="/ajustes" className="btn icon-btn" aria-label="Configurações"><Icon n="gear" /></Link>

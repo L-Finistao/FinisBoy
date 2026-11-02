@@ -4,7 +4,7 @@ import SwRegister from './SwRegister';
 import GameLayer from './_components/GameLayer';
 
 export const metadata = {
-  title: 'FinisBoy',
+  title: 'TurboSlug',
   manifest: '/manifest.json',
   icons: { icon: '/icon-192.png', apple: '/icon-192.png' },
 };

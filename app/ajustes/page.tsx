@@ -8,6 +8,9 @@ import * as A from '../../lib/client/store';
 import { newId, money } from '../../lib/core/format';
 import { MODE_LABEL, costParts, costPerKm, newProfile, parseMoney, type Pay, type Profile } from '../../lib/core/earnings';
 import { Shell } from '../_components/Shell';
+import { saveVoice, useVoiceCfg, voiceSupport } from '../../lib/client/voice';
+import { clearLearned, learnSummary, setLearnOn, useLive } from '../../lib/client/live';
+import { useKeepOn } from '../../lib/client/wake';
 import { Icon } from '../_components/Icon';
 
 const label = (m: number) => (m < 60 ? `${m} minutos` : m === 60 ? '1 hora' : `${m / 60} horas`);
@@ -27,6 +30,10 @@ export default function Ajustes() {
   const [target, setTarget] = useState('15');
   const [city, setCity] = useState('');
   const [saved, setSaved] = useState(false);
+  const vcfg = useVoiceCfg();
+  const { learn } = useLive();
+  const [keepOn, setKeepOn] = useKeepOn();
+  const sup = voiceSupport();
 
   // carrega os valores salvos uma vez, quando o app termina de ler o aparelho
   useEffect(() => {
@@ -90,6 +97,22 @@ export default function Ajustes() {
           <button className="primary" disabled={s.busy} onClick={() => void backupNow(true)}><Icon n="refresh" />{s.busy ? 'Salvando…' : 'Salvar agora'}</button>
           <button disabled={s.busy} onClick={() => void restore()}>Restaurar</button>
         </div>
+      </section>
+
+      <section className="panel" style={col}>
+        <div className="eyebrow">Assistente de voz</div>
+        <label className="check"><input type="checkbox" checked={vcfg.speak} disabled={!sup.speak} onChange={e => void saveVoice({ speak: e.target.checked })} /> Falar avisos (próxima parada, chegada, via lenta, fim da rota)</label>
+        <label className="check"><input type="checkbox" checked={vcfg.nav} disabled={!sup.speak} onChange={e => void saveVoice({ nav: e.target.checked })} /> Falar o caminho curva a curva ("Em 200 metros, vire à direita na Rua…")</label>
+        <label className="check"><input type="checkbox" checked={vcfg.listen} disabled={!sup.listen} onChange={e => void saveVoice({ listen: e.target.checked })} /> Escutar comandos durante a rota (diga "Turbo, ajuda")</label>
+        <p className="muted">Comandos: entrega feita · próxima parada · quanto falta · quantas faltam · quanto ganhei hoje · falar a rota · finalizar rota · repetir · silêncio. A escuta precisa de internet e do microfone liberado.{!sup.listen ? ' Este navegador não reconhece voz (use o Chrome no Android); os avisos falados continuam funcionando.' : ''}</p>
+      </section>
+
+      <section className="panel" style={col}>
+        <div className="eyebrow">Trechos lentos e tela</div>
+        <label className="check"><input type="checkbox" checked={keepOn} onChange={e => setKeepOn(e.target.checked)} /> Manter a tela acesa durante a rota</label>
+        <label className="check"><input type="checkbox" checked={learn.on} onChange={e => void setLearnOn(e.target.checked)} /> Evitar trechos lentos (aprendidos pelo GPS e marcados por mim)</label>
+        <p className="muted">Durante as rotas o app anota onde você anda devagar ou para (buraco, lombada, semáforo, trânsito). As próximas rotas fogem desses trechos, exceto nas ruas onde há entrega. {learnSummary()}</p>
+        <button type="button" className="soft-bad" onClick={() => { if (confirm('Apagar tudo o que o app aprendeu e as suas marcações de problemas?')) void clearLearned(); }}>Apagar o que foi aprendido</button>
       </section>
 
       <form style={{ display: 'contents' }} onSubmit={save}>

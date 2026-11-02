@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="logo.png" alt="FinisBoy" width="160">
+<img src="logo.png" alt="TurboSlug" width="160">
 
-# FinisBoy
+# TurboSlug
 
 **O app do motoboy: cole a lista de endereços do WhatsApp e receba a rota mais rápida, com controle de ganhos, gastos e km rodados.**
 

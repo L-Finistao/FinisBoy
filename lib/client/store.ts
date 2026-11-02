@@ -1,10 +1,13 @@
 import { local } from './local-db';
 import { geocode, ensureAutoCity, type GeoCtx } from '../core/geocode';
 import { optimizeRoute } from '../core/routing';
-import { newId, haversine } from '../core/format';
+import { newId, haversine, fmtDist } from '../core/format';
 import { parseText } from '../core/text';
 import { DEFAULT_PAY, autoProfileId, newProfile, normPid, type Expense, type Pay, type Profile } from '../core/earnings';
 import { setLiveTrackGuard } from './sync';
+import { finishDev, getLearn, liveFix, liveLoad, liveReset, saveLearned, spokenAddr } from './live';
+import { loadVoice, say } from './voice';
+import { hasLearning, routePenalty } from '../core/learn';
 import type { Delivery, LatLon, Route, Stop } from '../core/types';
 
 /* Estado do app (rotas, paradas, entregas). Tudo é lido e gravado no aparelho (IndexedDB);
@@ -79,11 +82,18 @@ function onPosition(p: GeolocationPosition) {
   }
   if (r) recordTrack(p);
   set({ me, routes });
+  const live = session();
+  if (live) {
+    liveFix(p, {
+      route: live, stops: state.stops, curId: state.curId, me, track, busy: state.busy,
+      reroute: () => { void buildRoute(); }, status: (m, ms) => setStatus(m, ms),
+    });
+  }
   if (Date.now() - lastSaved > 10000) {                  // grava no aparelho a cada 10 s (não a cada ponto do GPS)
     lastSaved = Date.now();
     void local.kvSet('lastMe', me, true);
     const cur = session();
-    if (cur) { void local.put('routes', cur); void saveTrack(); }
+    if (cur) { void local.put('routes', cur); void saveTrack(); void saveLearned(); }
   }
 }
 export function watchPosition() {
@@ -116,6 +126,7 @@ export async function init() {
   set({ stops, routes, deliveries, expenses, profiles, lastProfile, me, city, pay, target: t ?? 15, curId: running?.id || first?.id || null, ready: true });
   const live = routes.find(r => r.status === 'andamento');
   if (live) { const tk = await local.get<{ pts: number[][] }>('tracks', live.id); track = tk ? tk.pts : []; trackId = live.id; trackDirty = false; }
+  await Promise.all([liveLoad(), loadVoice()]);
   setLiveTrackGuard(id => session()?.id === id);            // o trajeto da rota em andamento só vai para o backup no fim
   document.addEventListener('visibilitychange', () => { if (document.hidden) void saveTrack(); });
   watchPosition();
@@ -155,15 +166,18 @@ async function optimize(r: Route, notes: string[]) {
   if (pts.length < 2) { await patchStop(list[0], { order: 0, legDist: null, legDur: null }); await saveRoute({ ...r, geo: null }); return; }
 
   setStatus('Calculando o melhor caminho…');
-  const { result: res, warn } = await optimizeRoute(pts, start);
+  const learn = getLearn(), deliveries = list.map(x => ({ lat: x.lat!, lon: x.lon! }));
+  const pen = hasLearning(learn) ? (coords: number[][], v: number) => routePenalty(learn, coords, v, deliveries) : undefined;
+  const { result: res, warn } = await optimizeRoute(pts, start, pen);
   if (warn) notes.push(warn);
   const off = start ? 1 : 0;
   for (const [k, s] of list.entries()) {
     const order = res.position[k + off] - off, leg = res.legs[order + off - 1];
     await patchStop(s, { order, legDist: leg ? leg.distance : null, legDur: leg ? leg.duration : null });
   }
-  const { coords, distance, duration, approx, baseline } = res;
-  await saveRoute({ ...r, geo: { coords, distance, duration, approx, baseline } });
+  const { coords, distance, duration, approx, baseline, steps, learned } = res;
+  if (learned) notes.push('Evitando trechos lentos aprendidos.');
+  await saveRoute({ ...r, geo: { coords, distance, duration, approx, baseline, steps, learned } });
 }
 
 let rerun = false;
@@ -234,11 +248,13 @@ export async function startRoute(id: string) {
   if (!r || !routeStops(id).some(s => !s.done)) { setStatus('Esta rota não tem paradas pendentes.', 4000); return; }
   const now = Date.now();
   track = []; trackId = id; trackDirty = true;
+  liveReset();
   await saveRoute({ ...r, status: 'andamento', startedAt: now, legStartedAt: now, km: 0, lastPt: null });
   set({ curId: id });
   await buildRoute();                                      // recalcula a partir de onde você está
   const cur = state.routes.find(x => x.id === id);
   if (cur?.geo) await saveRoute({ ...cur, kmPlan: cur.geo.distance });
+  say('Rota iniciada. ' + nextStopText());
 }
 
 export async function endRoute() {
@@ -249,8 +265,12 @@ export async function endRoute() {
     ...r, status: 'finalizada', endedAt: Date.now(), lastPt: null,
     kmSrc: gps >= 200 ? 'gps' : 'plan', kmFinal: gps >= 200 ? gps : (r.kmPlan || r.geo?.distance || 0),
   });
+  await finishDev(track);
   await saveTrack();
+  await saveLearned();
   track = []; trackId = null; trackDirty = false;
+  liveReset();
+  say(`Rota finalizada. ${routeStops(r.id).filter(x => x.done).length} entregas feitas.`);
   set({ curId: activeRoutes()[0]?.id || null });
   setStatus('✓ Rota finalizada e enviada ao histórico.', 4000);
 }
@@ -293,6 +313,7 @@ export async function markDone(id: string, done: boolean) {
     }
     await patchStop(s, { done: true, order: 5000, doneAt, durSec });
     await logDelivery(s, doneAt);
+    await finishDev(track);
     if (r && s.routeId === r.id && !pendingStops(r.id).length) { await endRoute(); return; }   // acabaram as paradas
   } else {
     const { doneAt: _d, durSec: _s, ...rest } = s;
@@ -300,6 +321,7 @@ export async function markDone(id: string, done: boolean) {
     await logDelivery(s, null);
   }
   await buildRoute();
+  if (done && r && state.curId === r.id) say(nextStopText());
 }
 
 export async function removeStop(id: string) {
@@ -365,3 +387,11 @@ export async function removeExpense(id: string) {
 export const earningsCtx = () => ({ profiles: state.profiles, routes: state.routes, deliveries: state.deliveries, expenses: state.expenses });
 
 export async function setLastProfile(id: string) { set({ lastProfile: id }); await local.kvSet('lastProfile', id); }
+
+// Texto falado da próxima parada ("Próxima parada: Rua X, a 800 metros.")
+export function nextStopText() {
+  const n = pendingStops(state.curId).find(x => x.lat != null) || pendingStops(state.curId)[0];
+  if (!n) return 'Não há paradas pendentes.';
+  const d = state.me && n.lat != null ? ', a ' + fmtDist(haversine(state.me, { lat: n.lat, lon: n.lon! })) : '';
+  return 'Próxima parada: ' + spokenAddr(n) + d + '.';
+}

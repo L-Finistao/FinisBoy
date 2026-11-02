@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Icon } from './Icon';
 import { money } from '../../lib/core/format';
-import type { Game, GameCfg } from '../../lib/core/game';
+import { FRAMES, companionOf, companionSay, type Game, type GameCfg } from '../../lib/core/game';
 
 export function Ring({ pct, size = 64, children }: { pct: number; size?: number; children?: React.ReactNode }) {
   const r = (size - 10) / 2, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
@@ -14,6 +14,18 @@ export function Ring({ pct, size = 64, children }: { pct: number; size?: number;
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: size * 0.22 }}>{children ?? `${Math.round(p * 100)}%`}</div>
     </div>
+  );
+}
+
+// Personagem montado em camadas: avatar + moldura + acessório (+ companheiro ao lado).
+export function Character({ cfg, size = 52, buddy = false }: { cfg: Pick<GameCfg, 'avatar' | 'accessory' | 'frame' | 'companion'>; size?: number; buddy?: boolean }) {
+  const fr = FRAMES.find(f => f.id === cfg.frame), comp = companionOf(cfg.companion);
+  return (
+    <span className="char" style={{ width: size, height: size, fontSize: size * 0.55 }}>
+      <span className={`avatar ${fr?.color ? 'framed' : ''}`} style={{ width: size, height: size, fontSize: 'inherit', ...(fr?.color ? { borderColor: fr.color, boxShadow: `0 0 0 2px #fff, 0 0 10px ${fr.color}` } : {}) }}>{cfg.avatar}</span>
+      {cfg.accessory && <i className="acc" style={{ fontSize: size * 0.4 }}>{cfg.accessory}</i>}
+      {buddy && <i className="bud" style={{ fontSize: size * 0.42 }}>{comp.e}</i>}
+    </span>
   );
 }
 
@@ -45,7 +57,7 @@ export function GameCard({ game, cfg, name }: { game: Game; cfg: GameCfg; name: 
   return (
     <section className="panel gcard">
       <Link href="/perfil" className="rowb" style={{ textDecoration: 'none', gap: 12 }}>
-        <span className="avatar">{cfg.avatar}</span>
+        <Character cfg={cfg} buddy />
         <span style={{ flex: 1, minWidth: 0 }}>
           <b style={{ display: 'block' }}>{cfg.nick || name}</b>
           <span className="muted">Nível {game.level} · {game.title}</span>
@@ -53,6 +65,7 @@ export function GameCard({ game, cfg, name }: { game: Game; cfg: GameCfg; name: 
         <span className="streak" title="Dias seguidos com entregas"><Icon n="flame" />{game.stats.curStreak}</span>
       </Link>
       <XpBar game={game} />
+      <div className="buddysay"><span>{companionOf(cfg.companion).e}</span><span><b>{companionOf(cfg.companion).name}:</b> {companionSay(companionOf(cfg.companion), game)}</span></div>
       <GoalRings game={game} cfg={cfg} />
       <div className={`chal ${ch.done ? 'done' : ''}`}>
         <span className="ic">{ch.done ? '✅' : ch.icon}</span>

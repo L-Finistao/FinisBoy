@@ -1,6 +1,6 @@
 {
-  "name": "FinisBoy",
-  "short_name": "FinisBoy",
+  "name": "TurboSlug",
+  "short_name": "TurboSlug",
   "start_url": "/rotas",
   "display": "standalone",
   "background_color": "#14221b",

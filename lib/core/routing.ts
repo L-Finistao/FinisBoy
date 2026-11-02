@@ -1,4 +1,5 @@
 import { haversine } from './format';
+import { osrmSteps, placeSteps } from './nav';
 import type { LatLon, RouteGeo } from './types';
 
 /* Otimização da rota: OSRM /table (tempos reais) + melhor ordem (exata até 13 paradas), traçado pelo OSRM /route.
@@ -9,6 +10,7 @@ export interface RouteResult extends RouteGeo {
   legs: { distance: number; duration: number }[];
 }
 
+export type Penalty = (coords: number[][], planV: number) => number;   // segundos extras de uma alternativa (trechos lentos aprendidos)
 const OSRM = 'https://router.project-osrm.org';
 
 // Internet que oscila conta como queda: passou de 8 s, desiste.
@@ -96,27 +98,56 @@ function baselineCost(T: number[][], D: number[][]) {
 const cs = (a: LatLon[]) => a.map(p => `${p.lon},${p.lat}`).join(';');
 const flip = (c: [number, number][]): [number, number][] => c.map(([lon, lat]) => [lat, lon]);
 
-async function osrmBest(pts: LatLon[], start: boolean): Promise<RouteResult> {
+async function osrmBest(pts: LatLon[], start: boolean, pen?: Penalty): Promise<RouteResult> {
   const tj = await fetchJson(`${OSRM}/table/v1/driving/${cs(pts)}?annotations=duration,distance`);
   if (tj.code !== 'Ok') throw new Error(tj.message || tj.code);
   const fix = (m: (number | null)[][]) => m.map(row => row.map(v => (v == null ? 1e9 : v)));
   const T = fix(tj.durations), D = fix(tj.distances);
   const { order, position } = planOrder(T, pts.length, start);
   const ordered = order.map(i => pts[i]);
-  const rj = await fetchJson(`${OSRM}/route/v1/driving/${cs(ordered)}?overview=full&geometries=geojson`);
+  if (pen && ordered.length <= 26) {                       // escolhe, trecho a trecho, a alternativa melhor pelo seu histórico
+    const lr = await osrmLegsLearned(ordered, pen);
+    return { position, legs: lr.legs, distance: lr.distance, duration: lr.duration, approx: false, coords: lr.coords, baseline: baselineCost(T, D), learned: lr.learned, steps: placeSteps(osrmSteps(lr.legs), lr.coords) };
+  }
+  const rj = await fetchJson(`${OSRM}/route/v1/driving/${cs(ordered)}?overview=full&geometries=geojson&steps=true`);
   if (rj.code !== 'Ok') throw new Error(rj.message || rj.code);
-  const r0 = rj.routes[0];
-  return { position, legs: r0.legs, distance: r0.distance, duration: r0.duration, approx: false, coords: flip(r0.geometry.coordinates), baseline: baselineCost(T, D) };
+  const r0 = rj.routes[0], coords = flip(r0.geometry.coordinates);
+  return { position, legs: r0.legs, distance: r0.distance, duration: r0.duration, approx: false, coords, baseline: baselineCost(T, D), steps: placeSteps(osrmSteps(r0.legs), coords) };
+}
+
+// Com histórico (trechos lentos, buracos, favoritas...): pede alternativas do OSRM para cada trecho entre paradas
+// e fica com a de menor tempo + penalidades. O OSRM só dá alternativas para 2 pontos.
+async function osrmLegsLearned(ordered: LatLon[], pen: Penalty) {
+  const jobs: (() => Promise<any>)[] = [];
+  for (let i = 0; i + 1 < ordered.length; i++) {
+    const a = ordered[i], b = ordered[i + 1];
+    jobs.push(() => fetchJson(`${OSRM}/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?alternatives=3&overview=full&geometries=geojson&steps=true`));
+  }
+  const res: any[] = [];
+  for (let i = 0; i < jobs.length; i += 4) res.push(...await Promise.all(jobs.slice(i, i + 4).map(f => f())));   // 4 por vez
+  const coords: [number, number][] = [], legs: any[] = [];
+  let distance = 0, duration = 0, learned = false;
+  for (const j of res) {
+    if (j.code !== 'Ok' || !j.routes.length) throw new Error(j.message || j.code);
+    const scored = j.routes.map((r: any) => { const c = flip(r.geometry.coordinates); return { r, c, cost: r.duration + pen(c, r.distance / Math.max(r.duration, 1)) }; });
+    const best = scored.reduce((x: any, y: any) => (y.cost < x.cost ? y : x));
+    if (best !== scored[0]) learned = true;
+    coords.push(...(coords.length ? best.c.slice(1) : best.c));
+    legs.push(best.r.legs[0]);
+    distance += best.r.distance; duration += best.r.duration;
+  }
+  return { coords, legs, distance, duration, learned };
 }
 
 // Plano B online: ordem escolhida pelo próprio OSRM (aproximada).
 async function osrmTrip(pts: LatLon[], start: boolean): Promise<RouteResult> {
-  const j = await fetchJson(`${OSRM}/trip/v1/driving/${cs(pts)}?roundtrip=false&source=${start ? 'first' : 'any'}&destination=any&geometries=geojson&overview=full`);
+  const j = await fetchJson(`${OSRM}/trip/v1/driving/${cs(pts)}?roundtrip=false&source=${start ? 'first' : 'any'}&destination=any&geometries=geojson&overview=full&steps=true`);
   if (j.code !== 'Ok') throw new Error(j.message || j.code);
   const trip = j.trips[0];
   return {
     position: j.waypoints.map((w: any) => w.waypoint_index), legs: trip.legs,
     coords: flip(trip.geometry.coordinates), distance: trip.distance, duration: trip.duration, approx: false, baseline: null,
+    steps: placeSteps(osrmSteps(trip.legs), flip(trip.geometry.coordinates)),
   };
 }
 
@@ -157,10 +188,10 @@ function localTrip(pts: LatLon[]): RouteResult {
 export interface OptimizeOut { result: RouteResult; warn: string }
 
 // pts: [partida (se start), ...paradas]. Tenta o OSRM; sem internet, cai para o cálculo em linha reta.
-export async function optimizeRoute(pts: LatLon[], start: boolean): Promise<OptimizeOut> {
+export async function optimizeRoute(pts: LatLon[], start: boolean, pen?: Penalty): Promise<OptimizeOut> {
   try {
     if (!navigator.onLine) throw new Error('offline');
-    try { return { result: await osrmBest(pts, start), warn: '' }; }
+    try { return { result: await osrmBest(pts, start, pen), warn: '' }; }
     catch (e) { if ((e as Error).name === 'AbortError') throw e; return { result: await osrmTrip(pts, start), warn: '' }; }
   } catch {
     return { result: localTrip(pts), warn: 'Sem internet: rota em linha reta (aproximada). Toque em Recalcular quando a conexão voltar.' };

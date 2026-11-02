@@ -1,4 +1,4 @@
-/* FinisBoy — design system. Verde de marca, cartões brancos sobre fundo esverdeado, tipografia do sistema.
+/* TurboSlug — design system. Verde de marca, cartões brancos sobre fundo esverdeado, tipografia do sistema.
    Tokens claros em :root, escuros em prefers-color-scheme. */
 :root {
   color-scheme: light;
@@ -199,4 +199,19 @@ details.hrow summary::-webkit-details-marker { display: none; }
 .pick button.sel { border: 2px solid var(--brand); background: var(--brand-soft); } .pick button.lock { opacity: .4; }
 .pick button small { position: absolute; bottom: -2px; right: -2px; font-size: .6rem; background: var(--dark); color: var(--dark-ink); border-radius: 6px; padding: 1px 4px; }
 .pick .sw { width: 76px; height: 52px; font-size: .75rem; color: #fff; font-weight: 700; }
+.char { position: relative; display: inline-block; flex: none; }
+.char .acc, .me .acc { position: absolute; top: -9px; right: -7px; font-style: normal; line-height: 1; filter: drop-shadow(0 1px 1px #0005); }
+.char .bud, .me .bud { position: absolute; bottom: -6px; right: -12px; font-style: normal; line-height: 1; background: #fff; border-radius: 50%; padding: 1px; box-shadow: 0 1px 3px #0005; }
+.me { position: relative; } .me .acc { font-size: 15px; } .me .bud { font-size: 16px; right: -14px; }
+.buddysay { display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: var(--r-s); padding: 8px 10px; font-size: .85rem; } .buddysay > span:first-child { font-size: 1.5rem; }
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.comp { min-height: 0; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 14px; font-size: .72rem; text-align: center; position: relative; }
+.comp .ic { font-size: 2rem; line-height: 1.1; } .comp.sel { border: 2px solid var(--brand); background: var(--brand-soft); } .comp.lock { opacity: .45; } .comp.lock .ic { filter: grayscale(1); }
+.hearts { letter-spacing: 1px; color: #e11d48; font-size: .8rem; }
+.preview { display: flex; align-items: center; gap: 16px; background: var(--brand-soft); border-radius: var(--r-s); padding: 14px; }
 .gmini { display: flex; align-items: center; gap: 10px; } .gmini .xpbar { flex: 1; }
+
+/* Corrida: ações em 5 colunas e marcadores de problema */
+.actions.five { grid-template-columns: repeat(5, 1fr); gap: 2px; } .actions.five button { font-size: .68rem; padding: 6px 2px; } .actions.five .ic { width: 38px; height: 38px; font-size: 1.1rem; }
+.hz { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid #dc2626; display: grid; place-items: center; font-size: 14px; box-shadow: 0 1px 4px #0006; }
+label.check { flex-direction: row; align-items: center; gap: 10px; color: var(--ink); font-size: .9rem; } label.check input { width: 20px; height: 20px; flex: none; }

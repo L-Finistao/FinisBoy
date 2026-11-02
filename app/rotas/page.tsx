@@ -7,8 +7,14 @@ import { useRequireUser } from '../../lib/client/use-sync';
 import * as A from '../../lib/client/store';
 import { Shell } from '../_components/Shell';
 import { Icon } from '../_components/Icon';
-import { GameCard } from '../_components/Game';
+import { Character, GameCard } from '../_components/Game';
+import { companionOf } from '../../lib/core/game';
 import { useGame } from '../../lib/client/game';
+import { useLive, addHazard, removeHazard, removeFav } from '../../lib/client/live';
+import { useVoiceCfg, startListening, stopListening, voiceSupport } from '../../lib/client/voice';
+import { onHeard, voiceRoute } from '../../lib/client/commands';
+import { useKeepOn, useWakeLock } from '../../lib/client/wake';
+import { HAZARD } from '../../lib/core/learn';
 import { fmtClock, fmtDist, fmtDur, money } from '../../lib/core/format';
 import { costPerKm, todayGross, type Profile } from '../../lib/core/earnings';
 import type { Stop } from '../../lib/core/types';
@@ -30,6 +36,10 @@ export default function Rotas() {
   const sync = useRequireUser();
   const app = useApp();
   const { cfg, game } = useGame();
+  const { info, learn } = useLive();
+  const vcfg = useVoiceCfg();
+  const [keepOn] = useKeepOn();
+  const [hz, setHz] = useState(false);
   const [adding, setAdding] = useState(false);
   const [follow, setFollow] = useState(true);
   const [center, setCenter] = useState(0);
@@ -51,6 +61,15 @@ export default function Rotas() {
   // ao iniciar a corrida o mapa acompanha você de novo
   const running = A.session();
   useEffect(() => { if (running) { setFollow(true); setExpanded(false); } }, [running?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // escuta contínua só com a rota iniciada; tela acesa durante a rota
+  useEffect(() => {
+    if (!running || !vcfg.listen || !voiceSupport().listen) return;
+    startListening(onHeard, m => A.setStatus(m, 6000));
+    A.setStatus('🎙 Escutando. Diga "Turbo, entrega feita" ou "Turbo, ajuda".', 5000);
+    return () => stopListening();
+  }, [running?.id, vcfg.listen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useWakeLock(!!running && keepOn);
 
   if (!sync.ready || !sync.user || !app.ready) return <div className="app"><p className="empty">Carregando…</p></div>;
 
@@ -87,7 +106,8 @@ export default function Rotas() {
 
   const map = (
     <MapView route={cur} stops={mine} me={app.me} picking={!!app.picking} follow={follow}
-      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} avatar={cfg.avatar} bottomPad={isRun ? sheetH : 0} />
+      onPick={(la, lo) => void A.placeStop(la, lo)} onDrag={() => setFollow(false)} centerSignal={center} avatar={cfg.avatar} accessory={cfg.accessory} buddy={companionOf(cfg.companion).e} bottomPad={isRun ? sheetH : 0}
+      learn={learn} near={isRun ? info.near : null} onRemoveHazard={id => void removeHazard(id)} onRemoveFav={id => void removeFav(id)} />
   );
   const locateBtn = (
     <button className="icon-btn locate" aria-label="Centralizar em mim" onClick={() => { setFollow(true); setCenter(c => c + 1); void A.getPosition(); }}><Icon n="locate" /></button>
@@ -104,7 +124,7 @@ export default function Rotas() {
         <div className="runtop">
           <Link href="/ajustes" className="btn icon-btn" aria-label="Configurações"><Icon n="gear" /></Link>
           <span className="chip"><i className={`dot ${sync.online ? '' : 'off'}`} />{sync.online ? 'online' : 'offline'}{app.me ? ' · GPS ativo' : ''}</span>
-          <span className="chip">⏱ {fmtClock((now - (running.startedAt || now)) / 1000)} · {fmtDist(running.km || 0)}</span>
+          <span className="chip">⏱ {fmtClock((now - (running.startedAt || now)) / 1000)} · {fmtDist(running.km || 0)}{info.speedKmh != null ? ` · ${info.speedKmh} km/h` : ''}</span>
         </div>
         <div className="runloc">{locateBtn}</div>
         {pickHint}
@@ -121,12 +141,18 @@ export default function Rotas() {
           </div>
           {game && (
             <div className="gmini" style={{ marginTop: 8 }}>
-              <span className="avatar" style={{ width: 30, height: 30, fontSize: '1rem', borderWidth: 2 }}>{cfg.avatar}</span>
+              <Character cfg={cfg} size={30} buddy />
               <span className="muted">Nv {game.level}</span>
               <div className="xpbar"><i style={{ width: `${game.pct * 100}%` }} /></div>
               {cfg.goals.dayDeliveries > 0 && <span className="muted">🎯 {game.stats.today.n}/{cfg.goals.dayDeliveries}</span>}
               <span className="streak"><Icon n="flame" />{game.stats.curStreak}</span>
             </div>
+          )}
+          {info.left > 0 && (
+            <p className="muted" style={{ marginTop: 6 }}>
+              Restam {fmtDist(info.left)} · {fmtDur(info.etaSec)} · chega {hhmm(now + info.etaSec * 1000)}{info.slowNote}
+              {running.geo?.learned ? ' · evitando trechos lentos' : ''}
+            </p>
           )}
           {next ? (
             <div className="next-in">
@@ -143,8 +169,10 @@ export default function Rotas() {
 
           {expanded && (
             <>
-              <div className="actions" style={{ marginTop: 10 }}>
+              <div className="actions five" style={{ marginTop: 10 }}>
                 <button disabled={app.busy} onClick={() => void A.buildRoute()}><span className="ic"><Icon n="refresh" /></span>Recalcular</button>
+                <button onClick={() => setHz(true)}><span className="ic" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>⚠</span>Problema</button>
+                <button onClick={() => voiceRoute()}><span className="ic">🔊</span>Falar rota</button>
                 <button onClick={() => setAdding(true)}><span className="ic"><Icon n="plus" /></span>Adicionar</button>
                 <button className="soft-bad" onClick={() => { if (confirm('Finalizar a rota e enviar para o histórico?')) void A.endRoute(); }}><span className="ic" style={{ background: 'var(--bad-soft)', color: 'var(--bad)' }}><Icon n="stop" /></span>Finalizar</button>
               </div>
@@ -177,6 +205,18 @@ export default function Rotas() {
         </section>
 
         {adding && <AddSheet app={app} target={target} onClose={() => setAdding(false)} onSubmit={submitAdd} />}
+        {hz && (
+          <div className="overlay" onClick={() => setHz(false)}>
+            <div className="sheet" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <h2>⚠ Marcar problema aqui</h2>
+              <p className="muted">As próximas rotas evitam este trecho. Toque num marcador do mapa para remover.</p>
+              {Object.entries(HAZARD).map(([k, h]) => (
+                <button key={k} onClick={async () => { setHz(false); const at = app.me; if (!at) { A.setStatus('Sem GPS: não consegui marcar o ponto.', 4000); return; } A.setStatus(await addHazard(k, at), 5000); }}>{h.icon} {h.label}</button>
+              ))}
+              <button className="ghost" onClick={() => setHz(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
