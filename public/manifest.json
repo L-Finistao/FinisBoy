@@ -1,10 +1,10 @@
 {
   "name": "FinisBoy",
   "short_name": "FinisBoy",
-  "start_url": "./index.html",
+  "start_url": "/rotas",
   "display": "standalone",
-  "background_color": "#42474C",
-  "theme_color": "#42474C",
+  "background_color": "#14221b",
+  "theme_color": "#14221b",
   "lang": "pt-BR",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

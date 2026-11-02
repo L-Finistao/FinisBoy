@@ -1,25 +1,16 @@
-const CACHE = 'finisboy-v39';
+// FinisBoy (Next.js): rede primeiro, com cópia no aparelho para abrir sem internet.
+// A versão antiga deste arquivo guardava o app antigo em cache: ao ativar, apaga tudo (menos os blocos do mapa).
+const PAGES = 'finisboy-next-v1';
 const TILES = 'finisboy-tiles';       // blocos do mapa: sobrevivem às atualizações do app
 const MAX_TILES = 8000;
 
-const SHELL = [
-  './', './index.html', './style.css', './app.js', './parse.js', './offline.js', './live.js', './auth.js', './avatar.js', './voice.js', './voicenav.js', './earnings.js', './history.js', './manifest.json',
-  './icon-192.png', './icon-512.png', './logo.png',
-  './vendor/leaflet.js', './vendor/leaflet.css',
-  './vendor/images/layers.png', './vendor/images/layers-2x.png',
-  './vendor/images/marker-icon.png', './vendor/images/marker-icon-2x.png', './vendor/images/marker-shadow.png',
-];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
-  self.skipWaiting();
-});
+self.addEventListener('install', () => { self.skipWaiting(); });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(
-    ks.filter(k => k !== CACHE && k !== TILES).map(k => caches.delete(k))
-  )));
-  self.clients.claim();
+  e.waitUntil((async () => {
+    for (const k of await caches.keys()) if (k !== PAGES && k !== TILES) await caches.delete(k);
+    await self.clients.claim();
+  })());
 });
 
 let puts = 0;
@@ -45,13 +36,16 @@ async function tile(req) {
   }
 }
 
-// Interface: abre do aparelho e atualiza em segundo plano quando há internet.
-async function shell(req) {
-  const cache = await caches.open(CACHE);
-  const hit = await cache.match(req, { ignoreSearch: true });
-  const net = fetch(req).then(r => { if (r.ok) cache.put(req, r.clone()); return r; }).catch(() => null);
-  if (hit) return hit;
-  return (await net) || (req.mode === 'navigate' ? cache.match('./index.html') : Response.error());
+// Páginas e arquivos do app: sempre a versão nova da rede; sem internet, a última que foi aberta.
+async function app(req) {
+  const cache = await caches.open(PAGES);
+  try {
+    const res = await fetch(req);
+    if (res.ok && !res.redirected) cache.put(req, res.clone());
+    return res;
+  } catch {
+    return (await cache.match(req)) || (req.mode === 'navigate' ? await cache.match('/rotas') : null) || Response.error();
+  }
 }
 
 self.addEventListener('fetch', e => {
@@ -60,6 +54,6 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.pathname.startsWith('/api/')) return;                       // contas e sincronização: sempre direto na rede, nunca em cache
   if (url.hostname === 'tile.openstreetmap.org') e.respondWith(tile(req));
-  else if (url.origin === location.origin) e.respondWith(shell(req));
-  // Nominatim e OSRM passam direto: o app trata a falta de internet.
+  else if (url.origin === location.origin) e.respondWith(app(req));
+  // ViaCEP, Nominatim e OSRM passam direto: o app trata a falta de internet.
 });

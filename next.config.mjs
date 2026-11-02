@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  // O app atual (JavaScript puro) fica em public/ e abre em "/" enquanto as telas migram para React.
-  async rewrites() {
-    return { beforeFiles: [{ source: '/', destination: '/index.html' }] };
+  // O app antigo (JavaScript puro, public/index.html) não é mais servido: tudo abre no app novo.
+  async redirects() {
+    return [
+      { source: '/', destination: '/rotas', permanent: false },
+      { source: '/index.html', destination: '/rotas', permanent: false },
+    ];
   },
   async headers() {
     return [
