@@ -9,7 +9,7 @@ import type { LatLon, Route, Stop } from '../../lib/core/types';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const pin = (text: string | number, cls = '') => L.divIcon({ className: '', html: `<div class="pin ${cls}">${text}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
-const meIcon = (look: Partial<Look> | undefined, buddy = '') => L.divIcon({ className: '', html: `<div class="me rider">${riderSvg(look, 46)}${buddy ? `<span class="companion-orbit" aria-label="Acompanhante orbitando o motorista"><i class="bud">${buddy}</i></span>` : ''}</div>`, iconSize: [84, 70], iconAnchor: [42, 58] });
+const meIcon = (look: Partial<Look> | undefined, buddy = '') => L.divIcon({ className: '', html: `<div class="me rider">${riderSvg(look, 46)}${buddy ? `<span class="companion-wander" aria-label="Acompanhante caminhando com o motorista"><i class="bud">${buddy}</i></span>` : ''}</div>`, iconSize: [84, 70], iconAnchor: [42, 58] });
 const hzIcon = (e: string) => L.divIcon({ className: '', html: `<div class="hz">${e}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
 
 interface Props {

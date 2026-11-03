@@ -18,14 +18,14 @@ export function Ring({ pct, size = 64, children }: { pct: number; size?: number;
   );
 }
 
-// Boneco do motoboy (corpo, equipamentos e veículo) em moldura, com o companheiro orbitando.
+// Boneco do motoboy (corpo, equipamentos e veículo) em moldura, com o companheiro caminhando por perto.
 export function Character({ cfg, size = 52, buddy = false }: { cfg: Pick<GameCfg, 'look' | 'frame' | 'companion'>; size?: number; buddy?: boolean }) {
   const fr = FRAMES.find(f => f.id === cfg.frame), comp = companionOf(cfg.companion), w = Math.round(size * 1.5);
   return (
     <span className="char" style={{ width: w, height: size }}>
       <span className="avatar rider" style={{ width: w, height: size, ...(fr?.color ? { borderColor: fr.color, boxShadow: `0 0 0 2px var(--card), 0 0 10px ${fr.color}` } : {}) }}
         dangerouslySetInnerHTML={{ __html: riderSvg(cfg.look, size * 0.86) }} />
-      {buddy && <span className="companion-orbit" aria-label={`${comp.name} orbitando o motorista`}><i className="bud" style={{ fontSize: size * 0.42 }}>{comp.e}</i></span>}
+      {buddy && <span className="companion-wander" aria-label={`${comp.name} acompanhando o motorista`}><i className="bud" style={{ fontSize: size * 0.42 }}>{comp.e}</i></span>}
     </span>
   );
 }
