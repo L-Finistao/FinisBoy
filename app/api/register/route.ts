@@ -6,8 +6,8 @@ import { json, sessionCookie } from '../../../lib/session';
 const Body = z.object({
   email: z.string().trim().toLowerCase().max(200).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'E-mail inválido.'),
   password: z.string().min(8, 'A senha precisa ter pelo menos 8 caracteres.').max(200),
-  name: z.string().trim().max(80).optional().default(''),
-  code: z.string().optional(),
+  name: z.string().trim().max(80).nullish().transform(v => v ?? ''),
+  code: z.string().nullish().transform(v => v ?? undefined),
 });
 
 export async function POST(req: Request) {

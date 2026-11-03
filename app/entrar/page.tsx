@@ -19,7 +19,8 @@ export default function Entrar() {
     setErr(''); setBusy(true);
     try {
       const r = await api(register ? '/register' : '/login', 'POST', {
-        email: f.get('email'), password: f.get('password'), name: f.get('name'), code: f.get('code'),
+        email: f.get('email'), password: f.get('password'),
+        ...(f.get('name') != null && { name: f.get('name') }), ...(f.get('code') != null && { code: f.get('code') }),   // campo que não está na tela vem null: não envia
       });
       if (!r.ok) {
         if (r.data.needCode) setNeedCode(true);
