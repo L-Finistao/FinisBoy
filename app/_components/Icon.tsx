@@ -15,6 +15,7 @@ const P: Record<string, ReactNode> = {
   wifioff: <path d="M2 2l20 20M5 12.5a10 10 0 0 1 3-2M10 6.2a14 14 0 0 1 9 3.3M8.5 16a5 5 0 0 1 7 0M12 20h.01" />,
   locate: <><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="8" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></>,
   more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
+  chevronDown: <path d="M6 9l6 6 6-6" />,
   box: <><path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8M12 13v8" /></>,
   wallet: <><path d="M3 7a2 2 0 0 1 2-2h13v4" /><rect x="3" y="7" width="18" height="13" rx="3" /><path d="M16 14h.01" /></>,
   route: <><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7" /></>,

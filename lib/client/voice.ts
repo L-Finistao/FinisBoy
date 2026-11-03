@@ -6,7 +6,7 @@ import { local } from './local-db';
    Usa o que o navegador já tem (speechSynthesis e SpeechRecognition), sem biblioteca nem servidor nosso. */
 
 export interface VoiceCfg { speak: boolean; listen: boolean; nav: boolean }
-const DEFAULT: VoiceCfg = { speak: true, listen: true, nav: true };
+const DEFAULT: VoiceCfg = { speak: true, listen: false, nav: true };
 
 let cfg: VoiceCfg = DEFAULT, loaded = false;
 const subs = new Set<() => void>();
@@ -26,6 +26,7 @@ export async function saveVoice(p: Partial<VoiceCfg>) {
   cfg = { ...cfg, ...p };
   emit();
   if (!cfg.speak) shutUp();
+  if (!cfg.listen) stopListening();
   await local.kvSet('voice', cfg);
 }
 export const useVoiceCfg = () => useSyncExternalStore(subscribe, () => cfg, () => DEFAULT);
@@ -60,6 +61,8 @@ export function shutUp() { try { speechSynthesis.cancel(); } catch { /* sem sín
 /* ---------- Escuta contínua (só com a rota iniciada) ---------- */
 let recog: any = null, want = false, fails = 0, timer: ReturnType<typeof setTimeout> | undefined;
 let handler: ((text: string) => void) | null = null, onError: ((msg: string) => void) | null = null;
+export const isListening = () => want;
+export const useVoiceListening = () => useSyncExternalStore(subscribe, () => want, () => false);
 
 function begin() {
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -87,10 +90,11 @@ function begin() {
 export function startListening(onText: (t: string) => void, onErr?: (m: string) => void) {
   handler = onText; onError = onErr || null;
   if (want) return;
-  want = true; fails = 0; begin();
+  want = true; fails = 0; emit(); begin();
 }
 export function stopListening() {
   want = false;
   clearTimeout(timer);
   if (recog) { try { recog.stop(); } catch { /* já parado */ } recog = null; }
+  emit();
 }

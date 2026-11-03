@@ -150,6 +150,7 @@ input, select, textarea { width: 100%; min-width: 0; font: inherit; color: var(-
 .runtop { position: absolute; z-index: 600; top: calc(10px + env(safe-area-inset-top)); left: 10px; right: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
 .runtop > * { pointer-events: auto; position: static; }
 .runtop .icon-btn { background: var(--card); box-shadow: var(--sh); }
+.runtop .run-finish { margin-left: auto; white-space: nowrap; }
 .runloc { position: absolute; z-index: 600; right: 10px; top: calc(62px + env(safe-area-inset-top)); }
 .runloc .locate { position: static; }
 .runstatus { position: absolute; z-index: 650; left: 10px; right: 10px; top: calc(64px + env(safe-area-inset-top)); }
@@ -160,7 +161,13 @@ input, select, textarea { width: 100%; min-width: 0; font: inherit; color: var(-
 .next-in { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .next-in .addr { font-size: 1.2rem; font-weight: 700; margin: 8px 0 2px; }
 .next-in .btns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin-top: 12px; }
-@media (max-width: 560px) { .runview .rsheet { border-radius: 22px 22px 0 0; } }
+@media (max-width: 560px) {
+  .runview .rsheet { border-radius: 22px 22px 0 0; }
+  .runtop { gap: 5px; }
+  .runtop .chip { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .runtop .run-finish { padding: 8px; min-width: 42px; font-size: 0; }
+  .runtop .run-finish .icon { width: 18px; height: 18px; }
+}
 
 /* Dia, histórico, ajustes */
 .daynav { display: flex; gap: 8px; align-items: center; padding: 10px; } .daynav input { flex: 1; min-width: 0; }

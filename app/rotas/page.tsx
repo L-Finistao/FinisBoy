@@ -12,7 +12,7 @@ import { ScanOrder, TicketChips } from './ScanOrder';
 import { companionOf } from '../../lib/core/game';
 import { useGame } from '../../lib/client/game';
 import { useLive, addHazard, removeHazard, removeFav } from '../../lib/client/live';
-import { useVoiceCfg, startListening, stopListening, voiceSupport } from '../../lib/client/voice';
+import { useVoiceCfg, useVoiceListening, startListening, stopListening, voiceSupport } from '../../lib/client/voice';
 import { onHeard, voiceRoute } from '../../lib/client/commands';
 import { useKeepOn, useWakeLock } from '../../lib/client/wake';
 import { HAZARD } from '../../lib/core/learn';
@@ -39,6 +39,7 @@ export default function Rotas() {
   const { cfg, game } = useGame();
   const { info, learn } = useLive();
   const vcfg = useVoiceCfg();
+  const listening = useVoiceListening();
   const [keepOn] = useKeepOn();
   const [hz, setHz] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -47,6 +48,7 @@ export default function Rotas() {
   const [all, setAll] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [runFocus, setRunFocus] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [sheetH, setSheetH] = useState(260);
   // altura real da folha inferior: o mapa enquadra a rota na parte que continua visível
@@ -61,15 +63,22 @@ export default function Rotas() {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   // ao iniciar a corrida o mapa acompanha você de novo
   const running = A.session();
-  useEffect(() => { if (running) { setFollow(true); setExpanded(false); } }, [running?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (running) { setFollow(true); setExpanded(false); setRunFocus(true); } else setRunFocus(false); }, [running?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // escuta contínua só com a rota iniciada; tela acesa durante a rota
+  // A escuta é manual: o usuário liga e desliga pelo controle da rota.
   useEffect(() => {
-    if (!running || !vcfg.listen || !voiceSupport().listen) return;
-    startListening(onHeard, m => A.setStatus(m, 6000));
-    A.setStatus('🎙 Escutando. Diga "Turbo, entrega feita" ou "Turbo, ajuda".', 5000);
+    if (!running || !vcfg.listen) stopListening();
     return () => stopListening();
-  }, [running?.id, vcfg.listen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [running?.id, vcfg.listen]);
+
+  function toggleVoice() {
+    if (!running || !vcfg.listen || !voiceSupport().listen) return;
+    if (listening) stopListening();
+    else {
+      startListening(onHeard, m => A.setStatus(m, 6000));
+      A.setStatus('🎙 Escutando somente agora. Diga "Turbo, ajuda".', 5000);
+    }
+  }
   useWakeLock(!!running && keepOn);
 
   if (!sync.ready || !sync.user || !app.ready) return <div className="app"><p className="empty">Carregando…</p></div>;
@@ -128,14 +137,17 @@ export default function Rotas() {
   );
 
   /* ---------- Corrida em andamento: o mapa ocupa a tela toda ---------- */
-  if (isRun && running) {
+  if (isRun && running && runFocus) {
     return (
       <div className="runview">
         <div className="runmap">{map}</div>
         <div className="runtop">
+          <button className="btn icon-btn" aria-label="Minimizar mapa" title="Minimizar mapa" onClick={() => setRunFocus(false)}><Icon n="chevronDown" /></button>
           <Link href="/ajustes" className="btn icon-btn" aria-label="Configurações"><Icon n="gear" /></Link>
+          {vcfg.listen && voiceSupport().listen && <button className={`btn voice-toggle ${listening ? 'active' : ''}`} onClick={toggleVoice} aria-pressed={listening}>{listening ? '🎙 Escutando' : '🎙 Ativar voz'}</button>}
           <span className="chip"><i className={`dot ${sync.online ? '' : 'off'}`} />{sync.online ? 'online' : 'offline'}{app.me ? ' · GPS ativo' : ''}</span>
           <span className="chip">⏱ {fmtClock((now - (running.startedAt || now)) / 1000)} · {fmtDist(running.km || 0)}{info.speedKmh != null ? ` · ${info.speedKmh} km/h` : ''}</span>
+          <button className="btn soft-bad run-finish" onClick={() => { if (confirm('Finalizar a rota e enviar para o histórico?')) void A.endRoute(); }}><Icon n="stop" />Finalizar</button>
         </div>
         <div className="runloc">{locateBtn}</div>
         {pickHint}
@@ -269,6 +281,12 @@ export default function Rotas() {
                 {app.profiles.map(p => <option key={p.id} value={p.id}>{profLabel(p)}</option>)}
               </select>
             </label>
+            {em && (
+              <div className="btns">
+                <button className="primary" onClick={e => { e.stopPropagation(); setRunFocus(true); }}><Icon n="play" />Retomar mapa</button>
+                <button className="soft-bad" onClick={e => { e.stopPropagation(); if (confirm('Finalizar a rota e enviar para o histórico?')) void A.endRoute(); }}><Icon n="stop" />Finalizar rota</button>
+              </div>
+            )}
             {!em && (
               <div className="btns">
                 <button className="primary" disabled={!!running} onClick={e => { e.stopPropagation(); void A.startRoute(r.id); }}><Icon n="play" />Iniciar corrida</button>
