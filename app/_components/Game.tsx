@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Icon } from './Icon';
 import { riderSvg } from '../../lib/core/rider';
 import { money } from '../../lib/core/format';
-import { FRAMES, companionOf, companionSay, type Game, type GameCfg } from '../../lib/core/game';
+import { ACH_XP, FRAMES, companionOf, companionSay, type Game, type GameCfg } from '../../lib/core/game';
 
 export function Ring({ pct, size = 64, children }: { pct: number; size?: number; children?: React.ReactNode }) {
   const r = (size - 10) / 2, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
@@ -18,14 +18,14 @@ export function Ring({ pct, size = 64, children }: { pct: number; size?: number;
   );
 }
 
-// Boneco do motoboy (corpo, equipamentos e veículo) em moldura, com o companheiro ao lado.
+// Boneco do motoboy (corpo, equipamentos e veículo) em moldura, com o companheiro orbitando.
 export function Character({ cfg, size = 52, buddy = false }: { cfg: Pick<GameCfg, 'look' | 'frame' | 'companion'>; size?: number; buddy?: boolean }) {
   const fr = FRAMES.find(f => f.id === cfg.frame), comp = companionOf(cfg.companion), w = Math.round(size * 1.5);
   return (
     <span className="char" style={{ width: w, height: size }}>
       <span className="avatar rider" style={{ width: w, height: size, ...(fr?.color ? { borderColor: fr.color, boxShadow: `0 0 0 2px var(--card), 0 0 10px ${fr.color}` } : {}) }}
         dangerouslySetInnerHTML={{ __html: riderSvg(cfg.look, size * 0.86) }} />
-      {buddy && <i className="bud" style={{ fontSize: size * 0.42 }}>{comp.e}</i>}
+      {buddy && <span className="companion-orbit" aria-label={`${comp.name} orbitando o motorista`}><i className="bud" style={{ fontSize: size * 0.42 }}>{comp.e}</i></span>}
     </span>
   );
 }
@@ -55,6 +55,7 @@ export function XpBar({ game }: { game: Game }) {
 // Cartão do jogador na tela de Rotas.
 export function GameCard({ game, cfg, name }: { game: Game; cfg: GameCfg; name: string }) {
   const ch = game.challenge;
+  const nextAch = [...game.ach].filter(a => !a.unlocked).sort((a, b) => b.pct - a.pct)[0];
   return (
     <section className="panel gcard">
       <Link href="/perfil" className="rowb" style={{ textDecoration: 'none', gap: 12 }}>
@@ -73,6 +74,16 @@ export function GameCard({ game, cfg, name }: { game: Game; cfg: GameCfg; name: 
         <span style={{ flex: 1 }}><b>Desafio: {ch.name}</b><div className="muted">{ch.desc} · {Math.min(Math.floor(ch.v), ch.goal)}/{ch.goal}</div></span>
         <b className="ok">+40</b>
       </div>
+      {nextAch ? (
+        <div className="next-ach">
+          <span className="ic">{nextAch.icon}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <b>Próxima conquista: {nextAch.name}</b>
+            <div className="xpbar"><i style={{ width: `${nextAch.pct * 100}%` }} /></div>
+            <div className="muted">{Math.min(Math.floor(nextAch.v), nextAch.goal)}/{nextAch.goal} · +{ACH_XP} XP</div>
+          </span>
+        </div>
+      ) : <div className="next-ach complete"><span className="ic">🏆</span><b>Todas as conquistas desbloqueadas</b></div>}
     </section>
   );
 }
