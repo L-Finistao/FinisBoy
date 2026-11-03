@@ -220,13 +220,15 @@ details.hrow summary::-webkit-details-marker { display: none; }
 .pick button.tx { width: auto; min-width: 52px; padding: 0 12px; font-size: .78rem; }
 .pick .sw { width: 76px; height: 52px; font-size: .75rem; color: #fff; font-weight: 700; }
 .char { position: relative; display: inline-block; flex: none; }
-.companion-wander { position: absolute; inset: -18px -24px; z-index: 2; perspective: 320px; transform-style: preserve-3d; animation: companion-walk 8s ease-in-out infinite; pointer-events: none; }
+.companion-wander { position: absolute; inset: -18px -24px; z-index: 0; perspective: 320px; transform-style: preserve-3d; pointer-events: none; }
 .companion-wander::before { content: ''; position: absolute; left: 50%; bottom: 3px; width: 42%; height: 8px; border-radius: 50%; background: var(--dark); opacity: .16; filter: blur(4px); transform: translateX(-50%) rotateX(68deg); }
 .char .companion-wander { inset: -18px -24px; }
-.me .companion-wander { inset: -12px -18px; }
-.companion-wander .bud { position: absolute; top: 0; left: 50%; display: grid; place-items: center; width: 1.65em; height: 1.65em; font-style: normal; line-height: 1; background: radial-gradient(circle at 35% 25%, #fff 0 8%, #dff7ff 28%, #67c8e8 68%, #16749d 100%); border: 2px solid #fff9; border-radius: 50%; box-shadow: inset -4px -5px 5px #07506e88, inset 3px 3px 4px #fff9, 0 4px 8px #0006; transform: translateX(-50%) rotateX(12deg) translateZ(16px); animation: companion-bob 1.2s ease-in-out infinite alternate; }
+.me .companion-wander { inset: -12px -18px; animation: companion-walk 8s ease-in-out infinite; }
+.companion-wander .bud { position: absolute; top: 0; left: 50%; display: grid; place-items: center; width: 1.65em; height: 1.65em; font-style: normal; line-height: 1; background: radial-gradient(circle at 35% 25%, #fff 0 8%, #dff7ff 28%, #67c8e8 68%, #16749d 100%); border: 2px solid #fff9; border-radius: 50%; box-shadow: inset -4px -5px 5px #07506e88, inset 3px 3px 4px #fff9, 0 4px 8px #0006; transform: translateX(-50%) rotateX(12deg) translateZ(16px); }
+.me .companion-wander .bud { animation: companion-bob 1.2s ease-in-out infinite alternate; }
 .avatar.rider { border-radius: 16px; overflow: hidden; display: grid; place-items: center; background: linear-gradient(160deg, var(--brand-soft), var(--card)); } .avatar.rider svg { display: block; }
-.me.rider { position: relative; width: 60px; height: 46px; background: none; border: 0; box-shadow: none; display: block; filter: drop-shadow(0 2px 3px #0007); } .me.rider svg { display: block; }
+.avatar.rider { position: relative; z-index: 1; }
+.me.rider { position: relative; width: 60px; height: 46px; background: none; border: 0; box-shadow: none; display: block; filter: drop-shadow(0 2px 3px #0007); } .me.rider svg { position: relative; z-index: 1; display: block; }
  .me .bud { font-size: 16px; }
 @keyframes companion-walk {
   0%, 100% { transform: translate3d(8px, -2px, 10px) rotate(-3deg); }
@@ -238,7 +240,7 @@ details.hrow summary::-webkit-details-marker { display: none; }
   90% { transform: translate3d(3px, -7px, 12px) rotate(5deg); }
 }
 @keyframes companion-bob { from { margin-top: 0; } to { margin-top: 4px; } }
-@media (prefers-reduced-motion: reduce) { .companion-wander { animation-duration: 18s; } .companion-wander .bud { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .me .companion-wander { animation-duration: 18s; } .me .companion-wander .bud { animation: none; } }
 .buddysay { display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: var(--r-s); padding: 8px 10px; font-size: .85rem; } .buddysay > span:first-child { font-size: 1.5rem; }
 .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
 .comp { min-height: 0; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 14px; font-size: .72rem; text-align: center; position: relative; }
