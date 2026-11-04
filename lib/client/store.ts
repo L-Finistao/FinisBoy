@@ -106,8 +106,13 @@ export const getPosition = () => new Promise<LatLon | null>(res => {
 });
 
 /* ---------- Início ---------- */
-export async function init() {
-  if (state.ready) return;
+let initing: Promise<void> | null = null;
+export function init(): Promise<void> {
+  if (state.ready) return Promise.resolve();
+  return (initing ??= doInit().catch(() => { set({ ready: true, status: 'Não foi possível abrir os dados do aparelho.' }); }).finally(() => { initing = null; }));
+}
+
+async function doInit() {
   const [stops, routes, deliveries] = await Promise.all([local.all<Stop>('stops'), local.all<Route>('routes'), local.all<Delivery>('deliveries')]);
   geoCache = (await local.kvGet('geocache')) || {};
   const me = (await local.kvGet<LatLon>('lastMe')) || null;

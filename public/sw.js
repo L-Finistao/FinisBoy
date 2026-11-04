@@ -1,6 +1,6 @@
 // TurboSlug (Next.js): rede primeiro, com cópia no aparelho para abrir sem internet.
 // A versão antiga deste arquivo guardava o app antigo em cache: ao ativar, apaga tudo (menos os blocos do mapa).
-const PAGES = 'turboslug-next-v1';
+const PAGES = 'turboslug-next-v2';
 const TILES = 'turboslug-tiles';       // blocos do mapa: sobrevivem às atualizações do app
 const MAX_TILES = 8000;
 

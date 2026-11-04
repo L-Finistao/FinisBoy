@@ -13,14 +13,18 @@ export const onLocalChange = (fn: Listener | null) => { listener = fn; };
 
 function open(): Promise<IDBDatabase> {
   return (dbp ??= new Promise((res, rej) => {
+    if (typeof indexedDB === 'undefined') { dbp = null; return rej(new Error('IndexedDB indisponível')); }
+    const fail = (e: unknown) => { dbp = null; rej(e); };
+    const timer = setTimeout(() => fail(new Error('IndexedDB demorou demais')), 6000);   // aba antiga bloqueando ou modo privado: não trava a tela
     const r = indexedDB.open(NAME, VERSION);
+    r.onblocked = () => fail(new Error('IndexedDB bloqueado'));
     r.onupgradeneeded = () => {
       const d = r.result;
       for (const n of SYNC_STORES) if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: 'id' });
       if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
     };
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => { dbp = null; rej(r.error); };
+    r.onsuccess = () => { clearTimeout(timer); res(r.result); };
+    r.onerror = () => { clearTimeout(timer); fail(r.error); };
   }));
 }
 

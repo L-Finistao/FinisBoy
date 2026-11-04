@@ -184,19 +184,25 @@ async function attach(user: User) {
 }
 
 // Descobre o usuário (a conta lembrada no aparelho permite abrir sem internet).
-export async function start(): Promise<void> {
-  if (state.ready) return;
+let starting: Promise<void> | null = null;
+export function start(): Promise<void> {
+  if (state.ready) return Promise.resolve();
+  return (starting ??= doStart().catch(() => { set({ ready: true }); }).finally(() => { starting = null; }));
+}
+
+async function doStart(): Promise<void> {
   onLocalChange(mark);
-  let user = (await local.kvGet<User>('authUser')) ?? null;
+  const safe = async <T,>(f: () => Promise<T>): Promise<T | undefined> => { try { return await f(); } catch { return undefined; } };   // banco local indisponível: segue sem ele
+  let user = (await safe(() => local.kvGet<User>('authUser'))) ?? null;
   try {
     const r = await api('/me');
-    if (r.ok) { user = r.data.user; await local.kvSet('authUser', user, true); }
-    else if (r.status === 401) { user = null; await local.kvSet('authUser', null, true); }
-  } catch { /* sem internet */ }
+    if (r.ok) { user = r.data.user; await safe(() => local.kvSet('authUser', user, true)); }
+    else if (r.status === 401) { user = null; await safe(() => local.kvSet('authUser', null, true)); }
+  } catch { /* sem internet ou servidor lento: usa a conta lembrada no aparelho */ }
 
-  const m = await local.kvGet('backupMinutes');
+  const m = await safe(() => local.kvGet('backupMinutes'));
   set({ minutes: isBackupMinutes(m) ? m : DEFAULT_BACKUP_MINUTES, online: navigator.onLine });
-  if (user) await attach(user);
+  if (user) await safe(() => attach(user!));
   set({ user, ready: true });
 
   window.addEventListener('online', () => { set({ online: true }); void backupNow(); });

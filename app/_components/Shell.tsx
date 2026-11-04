@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSync } from '../../lib/client/use-sync';
 import { Icon } from './Icon';
+import { ThemeToggle } from './ThemeToggle';
 
 const TABS = [
   { href: '/rotas', label: 'Rotas', icon: 'nav' },
@@ -44,6 +45,7 @@ export function Shell({ children, action, running = false }: { children: ReactNo
           <b>TurboSlug</b>
           <small><i className={`dot ${s.online ? '' : 'off'}`} />{s.online ? 'online' : 'offline'}</small>
         </div>
+        <ThemeToggle />
         <Link href="/ajustes" className="btn icon-btn" aria-label="Configurações"><Icon n="gear" /></Link>
         {action}
       </header>
